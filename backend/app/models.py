@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Enum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -105,7 +105,12 @@ class DumpedMessage(Base):
     telegram_message_id = Column(Integer, nullable=False)
     sender_id = Column(String(100), nullable=True)
     sender_name = Column(String(255), nullable=True)
+    sender_username = Column(String(255), nullable=True) # Added for UI consistency
     content = Column(Text, nullable=True)
     media_type = Column(String(50), nullable=True)
     message_date = Column(DateTime, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    __table_args__ = (
+        UniqueConstraint('session_id', 'chat_id', 'telegram_message_id', name='_unique_msg_uc'),
+    )

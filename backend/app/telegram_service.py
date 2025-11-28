@@ -32,17 +32,24 @@ class TelegramManager:
             try:
                 print(f"[DEBUG] New message from {message.chat.id} in session {session_id}")
                 async with AsyncSessionLocal() as db:
-                    chat_name = message.chat.title or message.chat.first_name or str(message.chat.id)
-                    if message.chat.last_name: chat_name += f" {message.chat.last_name}"
+                    # Improved Name Resolution
+                    chat_name = message.chat.title
+                    if not chat_name:
+                        chat_name = f"{message.chat.first_name or ''} {message.chat.last_name or ''}".strip()
+                    if not chat_name:
+                        chat_name = message.chat.username or "Unknown"
+                    
                     chat_username = message.chat.username
-                    sender_name = None; sender_username = None
+                    
+                    sender_name = "Unknown"
+                    sender_username = None
                     if message.from_user:
-                        sender_name = message.from_user.first_name
-                        if message.from_user.last_name: sender_name += f" {message.from_user.last_name}"
+                        sender_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip() or "Unknown"
                         sender_username = message.from_user.username
                     elif message.sender_chat:
-                        sender_name = message.sender_chat.title
+                        sender_name = message.sender_chat.title or "Unknown Group/Channel"
                         sender_username = message.sender_chat.username
+                    
                     media_type = None
                     if message.photo: media_type = 'photo'
                     elif message.video: media_type = 'video'
@@ -51,13 +58,15 @@ class TelegramManager:
                     elif message.voice: media_type = 'voice'
                     elif message.audio: media_type = 'audio'
                     elif message.video_note: media_type = 'video_note'
+
                     content = message.text or message.caption or ""
                     if not content and media_type: content = f"[{media_type.upper()}]"
                     timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+
                     new_log = MessageLog(
                         telegram_message_id=message.id, chat_id=str(message.chat.id), chat_name=chat_name, chat_username=chat_username,
                         sender_id=str(message.from_user.id) if message.from_user else str(message.sender_chat.id) if message.sender_chat else None,
-                        sender_name=sender_name or "Unknown", sender_username=sender_username,
+                        sender_name=sender_name, sender_username=sender_username,
                         content=content, media_type=media_type, timestamp=timestamp, session_id=session_id
                     )
                     db.add(new_log); await db.commit(); await db.refresh(new_log)
@@ -112,13 +121,26 @@ class TelegramManager:
         except Exception as e: return {"success": False, "error": str(e)}
 
     @staticmethod
-    async def get_dialogs(session_id: int, limit: int = 50) -> dict:
+    async def get_dialogs(session_id: int, limit: int = 100) -> dict:
         client = active_clients.get(session_id)
         if not client: return {"error": "Client not active", "chats": []}
         try:
             chats = []
             async for d in client.get_dialogs(limit=limit):
-                chats.append({"id": str(d.chat.id), "name": d.chat.title or "Unknown", "type": str(d.chat.type.name).lower(), "username": d.chat.username, "members_count": d.chat.members_count})
+                # Improved Name Resolution Logic
+                name = d.chat.title
+                if not name:
+                    name = f"{d.chat.first_name or ''} {d.chat.last_name or ''}".strip()
+                if not name:
+                    name = d.chat.username or "Unknown"
+                
+                chats.append({
+                    "id": str(d.chat.id),
+                    "name": name,
+                    "type": str(d.chat.type.name).lower(),
+                    "username": d.chat.username,
+                    "members_count": d.chat.members_count
+                })
             return {"chats": chats, "success": True}
         except Exception as e: return {"error": str(e), "chats": []}
 

@@ -16,26 +16,19 @@ async def auto_dump_job():
     print("[SCHEDULER] Checking for missing dumps...")
     async with AsyncSessionLocal() as db:
         sessions = (await db.execute(select(TelegramSession).where(TelegramSession.is_active == True))).scalars().all()
-        
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = datetime.utcnow().replace(hour=23, minute=59, second=59, microsecond=999999)
 
         for s in sessions:
-            query = select(DumpTask).where(
-                and_(
-                    DumpTask.session_id == s.id,
-                    DumpTask.status == 'completed',
-                    DumpTask.target_date >= today_start,
-                    DumpTask.target_date <= today_end
-                )
-            )
+            query = select(DumpTask).where(and_(DumpTask.session_id == s.id, DumpTask.status == 'completed', DumpTask.target_date >= today_start, DumpTask.target_date <= today_end))
             existing_task = (await db.execute(query)).scalar_one_or_none()
             
             if not existing_task:
-                print(f"[SCHEDULER] No dump found for today for session {s.session_name}. Starting auto-dump...")
-                dump_messages_task.apply_async(args=[s.id, None, today_start.isoformat(), today_end.isoformat()], kwargs={'is_auto': True})
+                print(f"[SCHEDULER] Auto-dump starting for session {s.session_name}...")
+                # Pass empty list for ALL chats
+                dump_messages_task.apply_async(args=[s.id, [], today_start.isoformat(), today_end.isoformat()], kwargs={'is_auto': True})
             else:
-                print(f"[SCHEDULER] Dump for today already exists for {s.session_name}. Skipping.")
+                print(f"[SCHEDULER] Dump exists for {s.session_name}. Skipping.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

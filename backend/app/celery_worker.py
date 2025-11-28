@@ -65,11 +65,13 @@ async def save_dumped_message(session_id, chat_id, chat_name, msg):
         content = msg.text or msg.caption or ""
         sender_id = str(msg.from_user.id) if msg.from_user else str(msg.sender_chat.id) if msg.sender_chat else None
         sender_name = f"{msg.from_user.first_name} {msg.from_user.last_name or ''}" if msg.from_user else msg.sender_chat.title if msg.sender_chat else "Unknown"
-
+        sender_username = msg.from_user.username if msg.from_user else msg.sender_chat.username if msg.sender_chat else None
+        
         await conn.execute('''
-            INSERT INTO dumped_messages (session_id, chat_id, chat_name, telegram_message_id, sender_id, sender_name, content, media_type, message_date, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ''', session_id, str(chat_id), chat_name, msg.id, sender_id, sender_name.strip(), content, media_type, msg.date, datetime.utcnow())
+            INSERT INTO dumped_messages (session_id, chat_id, chat_name, telegram_message_id, sender_id, sender_name, sender_username, content, media_type, message_date, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ON CONFLICT (session_id, chat_id, telegram_message_id) DO NOTHING
+        ''', session_id, str(chat_id), chat_name, msg.id, sender_id, sender_name.strip(), sender_username, content, media_type, msg.date, datetime.utcnow())
     except Exception as e:
         print(f"Error saving dump msg: {e}")
     finally:
@@ -108,24 +110,16 @@ def parse_ts(ts):
     except:
         return None
 
-async def process_download(self, session_id: int, chat_id: str, media_types: list, start_time=None, end_time=None, limit=None, save_locally=False):
+async def process_download(self, session_id: int, chat_ids: list, media_types: list, start_time=None, end_time=None, limit=None, save_locally=False):
     session_string, api_id, api_hash = await get_session_string_safe(session_id)
     if not session_string: return {'status': 'failed', 'error': 'Session not found'}
     
-    try:
-        target_chat = int(chat_id)
-    except ValueError:
-        target_chat = chat_id
-
-    if limit:
-        try:
-            limit = int(limit)
-        except:
-            limit = None
-
     start_dt = parse_ts(start_time)
     end_dt = parse_ts(end_time)
-    
+    if limit:
+        try: limit = int(limit)
+        except: limit = None
+
     workdir = f"./sessions/worker_{session_id}"
     os.makedirs(workdir, exist_ok=True)
     client = Client(name=f"worker_downloader_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True)
@@ -133,89 +127,96 @@ async def process_download(self, session_id: int, chat_id: str, media_types: lis
     
     try:
         await client.start()
-        chat_title = "Unknown Chat"
-        chat_username = ""
-        try:
-            chat_info = await client.get_chat(target_chat)
-            chat_title = chat_info.title or f"{chat_info.first_name} {chat_info.last_name or ''}".strip()
-            chat_username = chat_info.username
-            self.update_state(state='PROGRESS', meta={'status': f'Target: {chat_title}. Scanning...', 'progress': 5})
-        except Exception as e: return {'status': 'failed', 'error': f'Cannot access chat: {e}'}
-
-        target_messages = []
-        scanned = 0
-        async for message in client.get_chat_history(target_chat):
-            scanned += 1
-            if scanned % 50 == 0: self.update_state(state='PROGRESS', meta={'status': f'Scanning {scanned}... Found {len(target_messages)} matches.', 'progress': 10})
-            if end_dt and message.date > end_dt: continue
-            if start_dt and message.date < start_dt: break 
-            is_match = False
-            if 'photo' in media_types and message.photo: is_match = True
-            elif 'video' in media_types and (message.video or message.video_note): is_match = True
-            elif 'audio' in media_types and (message.audio or message.voice): is_match = True
-            elif message.document:
-                fname = message.document.file_name or ""
-                is_arc = is_archive(fname)
-                if 'archive' in media_types and is_arc: is_match = True
-                elif 'document' in media_types and not is_arc: is_match = True
-            if is_match:
-                target_messages.append(message)
-                if limit and len(target_messages) >= limit: break
         
-        total = len(target_messages)
-        if total == 0: return {'status': 'completed', 'total_files': 0, 'message': f'Scan finished. Scanned {scanned} messages but found NO matching media.'}
+        target_chats = []
+        if not chat_ids or not chat_ids[0]:
+             async for d in client.get_dialogs(): target_chats.append(d.chat.id)
+        else:
+             for cid in chat_ids:
+                try:
+                    target_chats.append(int(cid) if str(cid).lstrip('-').isdigit() else cid)
+                except: target_chats.append(cid)
 
         temp_dir = "/app/media/temp_downloads"
         os.makedirs(temp_dir, exist_ok=True)
         export_dir = "/app/exports"
         if save_locally: os.makedirs(export_dir, exist_ok=True)
 
-        folder_name = chat_username if chat_username else sanitize_filename(chat_title)
-        folder_name = f"{session_id}_{folder_name}"
+        total_downloaded = 0
 
-        for i, message in enumerate(target_messages):
+        for idx, target_chat in enumerate(target_chats):
             try:
-                fname = "unknown"; ftype="other"; mime="application/octet-stream"
-                if message.photo: fname=f"photo_{message.id}.jpg"; mime="image/jpeg"; ftype="image"
-                elif message.video: fname=message.video.file_name or f"video_{message.id}.mp4"; mime=message.video.mime_type or "video/mp4"; ftype="video"
-                elif message.video_note: fname=f"videonote_{message.id}.mp4"; mime="video/mp4"; ftype="video"
-                elif message.audio: fname=message.audio.file_name or f"audio_{message.id}.mp3"; mime=message.audio.mime_type or "audio/mpeg"; ftype="audio"
-                elif message.voice: fname=f"voice_{message.id}.ogg"; mime=message.voice.mime_type or "audio/ogg"; ftype="audio"
-                elif message.document:
-                    fname=message.document.file_name or f"doc_{message.id}"; mime=message.document.mime_type or "application/octet-stream"
-                    if is_archive(fname): ftype="archive"
-                    else: ftype="document"
+                chat_info = await client.get_chat(target_chat)
+                chat_title = chat_info.title or f"{chat_info.first_name} {chat_info.last_name or ''}".strip()
+                chat_username = chat_info.username
+                self.update_state(state='PROGRESS', meta={'status': f'Processing {chat_title} ({idx+1}/{len(target_chats)})', 'progress': 0})
+
+                target_messages = []
+                async for message in client.get_chat_history(target_chat):
+                    if end_dt and message.date > end_dt: continue
+                    if start_dt and message.date < start_dt: break
+                    is_match = False
+                    if 'photo' in media_types and message.photo: is_match = True
+                    elif 'video' in media_types and (message.video or message.video_note): is_match = True
+                    elif 'audio' in media_types and (message.audio or message.voice): is_match = True
+                    elif message.document:
+                        fname = message.document.file_name or ""
+                        is_arc = is_archive(fname)
+                        if 'archive' in media_types and is_arc: is_match = True
+                        elif 'document' in media_types and not is_arc: is_match = True
+                    if is_match:
+                        target_messages.append(message)
+                        if limit and len(target_messages) >= limit: break
                 
-                self.update_state(state='PROGRESS', meta={'current': i+1, 'total': total, 'progress': int(i/total*100), 'status': f'Downloading {fname}...'})
-                local_path = await client.download_media(message, file_name=os.path.join(temp_dir, fname))
-                
-                if local_path:
-                    self.update_state(state='PROGRESS', meta={'status': f'Uploading {fname}...', 'progress': int(i/total*100)})
-                    size = os.path.getsize(local_path)
-                    obj_name = f"{session_id}/{folder_name}/{os.path.basename(local_path)}"
-                    await run_in_thread(StorageManager.upload_file, local_path, obj_name, mime)
-                    await save_file_metadata(session_id, str(chat_id), chat_title, message.id, os.path.basename(local_path), obj_name, ftype, size)
-                    downloaded_files.append(obj_name)
-                    if save_locally:
-                        try:
-                            chat_export_dir = os.path.join(export_dir, folder_name)
-                            os.makedirs(chat_export_dir, exist_ok=True)
-                            dest_path = os.path.join(chat_export_dir, os.path.basename(local_path))
-                            shutil.copy2(local_path, dest_path)
-                        except Exception as e: print(f"Export error: {e}")
-                    os.remove(local_path)
-            except Exception: continue
-        return {'status': 'completed', 'total_files': total, 'message': f'Downloaded {len(downloaded_files)} files from {chat_title}'}
+                folder_name = chat_username if chat_username else sanitize_filename(chat_title)
+                folder_name = f"{session_id}_{folder_name}"
+
+                for i, message in enumerate(target_messages):
+                    try:
+                        fname = "unknown"; ftype="other"; mime="application/octet-stream"
+                        if message.photo: fname=f"photo_{message.id}.jpg"; mime="image/jpeg"; ftype="image"
+                        elif message.video: fname=message.video.file_name or f"video_{message.id}.mp4"; mime=message.video.mime_type or "video/mp4"; ftype="video"
+                        elif message.video_note: fname=f"videonote_{message.id}.mp4"; mime="video/mp4"; ftype="video"
+                        elif message.audio: fname=message.audio.file_name or f"audio_{message.id}.mp3"; mime=message.audio.mime_type or "audio/mpeg"; ftype="audio"
+                        elif message.voice: fname=f"voice_{message.id}.ogg"; mime=message.voice.mime_type or "audio/ogg"; ftype="audio"
+                        elif message.document:
+                            fname=message.document.file_name or f"doc_{message.id}"; mime=message.document.mime_type or "application/octet-stream"
+                            if is_archive(fname): ftype="archive"
+                            else: ftype="document"
+                        
+                        local_path = await client.download_media(message, file_name=os.path.join(temp_dir, fname))
+                        if local_path:
+                            size = os.path.getsize(local_path)
+                            obj_name = f"{session_id}/{folder_name}/{os.path.basename(local_path)}"
+                            await run_in_thread(StorageManager.upload_file, local_path, obj_name, mime)
+                            await save_file_metadata(session_id, str(target_chat), chat_title, message.id, os.path.basename(local_path), obj_name, ftype, size)
+                            total_downloaded += 1
+                            if save_locally:
+                                try:
+                                    chat_export_dir = os.path.join(export_dir, folder_name)
+                                    os.makedirs(chat_export_dir, exist_ok=True)
+                                    shutil.copy2(local_path, os.path.join(chat_export_dir, os.path.basename(local_path)))
+                                except: pass
+                            os.remove(local_path)
+                            self.update_state(state='PROGRESS', meta={'status': f'Downloaded {fname}...', 'progress': int(idx/len(target_chats)*100)})
+                    except Exception: continue
+
+            except Exception as e: 
+                print(f"Error processing chat {target_chat}: {e}")
+                continue
+            
+        return {'status': 'completed', 'total_files': total_downloaded, 'message': f'Downloaded {total_downloaded} files from {len(target_chats)} chats'}
     except Exception as e:
         return {'status': 'failed', 'error': str(e)}
     finally:
         if client.is_connected:
             await client.stop()
 
-async def process_dump(self, session_id: int, chat_id: str, start_time=None, end_time=None, task_db_id=None):
+async def process_dump(self, session_id: int, chat_ids: list, start_time=None, end_time=None, task_db_id=None):
     session_string, api_id, api_hash = await get_session_string_safe(session_id)
     if not session_string:
-        if task_db_id: await update_dump_task_status(task_db_id, 'failed', error='Session not found')
+        if task_db_id: 
+            await update_dump_task_status(task_db_id, 'failed', error='Session not found')
         return {'status': 'failed', 'error': 'Session not found'}
     
     start_dt = parse_ts(start_time)
@@ -226,27 +227,25 @@ async def process_dump(self, session_id: int, chat_id: str, start_time=None, end
     client = Client(name=f"worker_dumper_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True)
     
     count = 0
-    if task_db_id: await update_dump_task_status(task_db_id, 'running')
+    if task_db_id: 
+        await update_dump_task_status(task_db_id, 'running')
     
     try:
         await client.start()
-        self.update_state(state='PROGRESS', meta={'status': 'Connected. Resolving targets...', 'progress': 0})
+        self.update_state(state='PROGRESS', meta={'status': 'Resolving targets...', 'progress': 0})
         
         target_chats = []
-        if chat_id:
-            try:
-                try: target = int(chat_id)
-                except: target = chat_id
-                chat = await client.get_chat(target)
-                target_chats.append(chat)
-            except: 
-                if task_db_id: await update_dump_task_status(task_db_id, 'failed', error='Invalid Chat ID')
-                return {'status': 'failed', 'error': 'Invalid Chat ID'}
+        if not chat_ids or not chat_ids[0]:
+             async for d in client.get_dialogs(): target_chats.append(d.chat)
         else:
-            self.update_state(state='PROGRESS', meta={'status': 'Fetching ALL chats...', 'progress': 5})
-            async for dialog in client.get_dialogs():
-                target_chats.append(dialog.chat)
-        
+             for cid in chat_ids:
+                 try: 
+                     val = int(cid) if str(cid).lstrip('-').isdigit() else cid
+                     chat = await client.get_chat(val)
+                     target_chats.append(chat)
+                 except Exception as e: 
+                     print(f"Resolve fail {cid}: {e}")
+
         total_chats = len(target_chats)
         export_dir = "/app/exports/dumps"
         os.makedirs(export_dir, exist_ok=True)
@@ -272,14 +271,16 @@ async def process_dump(self, session_id: int, chat_id: str, start_time=None, end
                     f.write(json.dumps(dump_obj) + "\n")
                     
                     count += 1
-                    if count % 100 == 0: 
-                        self.update_state(state='PROGRESS', meta={'status': f'Dumped {count} msgs (Current: {chat_title})', 'progress': int(idx/total_chats*100)})
-                        if task_db_id: await update_dump_task_status(task_db_id, 'running', progress=int(idx/total_chats*100), total=count)
+                    if count % 100 == 0:
+                        if task_db_id: 
+                            await update_dump_task_status(task_db_id, 'running', progress=int(idx/total_chats*100), total=count)
         
-        if task_db_id: await update_dump_task_status(task_db_id, 'completed', progress=100, total=count)
+        if task_db_id: 
+            await update_dump_task_status(task_db_id, 'completed', progress=100, total=count)
         return {'status': 'completed', 'total_messages': count, 'message': f'Dumped {count} messages from {total_chats} chats.'}
     except Exception as e:
-        if task_db_id: await update_dump_task_status(task_db_id, 'failed', error=str(e))
+        if task_db_id: 
+            await update_dump_task_status(task_db_id, 'failed', error=str(e))
         return {'status': 'failed', 'error': str(e)}
     finally:
         if client.is_connected:
@@ -302,24 +303,24 @@ async def process_broadcast(self, session_id: int, message: str, target_chat_ids
                     except: pass
                 await client.send_message(target, message)
                 sent += 1
-            except Exception as e: print(f"Broadcast fail: {e}"); failed += 1
+            except Exception as e: 
+                print(f"Broadcast fail: {e}"); failed += 1
             self.update_state(state='PROGRESS', meta={'current': idx+1, 'total': total, 'sent': sent, 'failed': failed, 'progress': int((idx+1)/total*100), 'status': f'Sending to {chat_id}...'})
             if idx < total - 1: await asyncio.sleep(random.uniform(delay_min, delay_max))
         return {'status': 'completed', 'sent': sent, 'failed': failed, 'message': f'Broadcast Finished. Sent: {sent}, Failed: {failed}'}
-    except Exception as e:
-        return {'status': 'failed', 'error': str(e)}
+    except Exception as e: return {'status': 'failed', 'error': str(e)}
     finally:
         if client.is_connected:
             await client.stop()
 
 @celery_app.task(bind=True)
-def download_media_task(self, session_id: int, chat_id: str, media_types: list, start_time=None, end_time=None, limit=None, save_locally=False):
-    return asyncio.run(process_download(self, session_id, chat_id, media_types, start_time, end_time, limit, save_locally))
+def download_media_task(self, session_id: int, chat_ids: list, media_types: list, start_time=None, end_time=None, limit=None, save_locally=False):
+    return asyncio.run(process_download(self, session_id, chat_ids, media_types, start_time, end_time, limit, save_locally))
 
 @celery_app.task(bind=True)
 def broadcast_message_task(self, session_id: int, message: str, target_chat_ids: list, delay_min: int = 2, delay_max: int = 5):
     return asyncio.run(process_broadcast(self, session_id, message, target_chat_ids, delay_min, delay_max))
 
 @celery_app.task(bind=True)
-def dump_messages_task(self, session_id: int, chat_id: str, start_time=None, end_time=None, task_db_id=None, is_auto=False):
-    return asyncio.run(process_dump(self, session_id, chat_id, start_time, end_time, task_db_id))
+def dump_messages_task(self, session_id: int, chat_ids: list, start_time=None, end_time=None, task_db_id=None, is_auto=False):
+    return asyncio.run(process_dump(self, session_id, chat_ids, start_time, end_time, task_db_id))

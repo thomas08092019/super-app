@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Users, MessageSquare, Bot, Database, Search, Radio, ChevronDown, ChevronRight, LogOut, Menu, X, Folder } from 'lucide-react';
+import { LayoutDashboard, Users, MessageSquare, Bot, Database, Search, Radio, ChevronDown, ChevronRight, LogOut, Menu, X, Folder, Archive } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
 interface MenuItem { name: string; path?: string; icon: any; children?: MenuItem[]; adminOnly?: boolean; }
@@ -12,7 +12,7 @@ const menuItems: MenuItem[] = [
       { name: 'Live Feed', path: '/telegram/feed', icon: Radio },
       { name: 'AI Summary', path: '/telegram/summary', icon: Bot },
       { name: 'Data Miner', path: '/telegram/downloader', icon: Database },
-      { name: 'Dump Manager', path: '/telegram/dumps', icon: Database },
+      { name: 'Dump Manager', path: '/telegram/dumps', icon: Archive },
       { name: 'File Manager', path: '/telegram/files', icon: Folder },
       { name: 'OSINT Tools', path: '/telegram/osint', icon: Search },
       { name: 'Broadcaster', path: '/telegram/broadcast', icon: Radio },

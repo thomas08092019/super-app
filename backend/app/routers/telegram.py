@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSoc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, distinct
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import get_db
 from app.models import User, TelegramSession, MessageLog
 from app.schemas import TelegramLoginRequest, TelegramOTPRequest, Telegram2FARequest, TelegramSessionResponse, ProfileLookupResponse, GroupLookupResponse
@@ -21,6 +21,7 @@ async def ws_broadcast(session_id: int, message_log: MessageLog):
         "type": "message", "session_id": session_id,
         "message": {
             "id": message_log.id, "telegram_message_id": message_log.telegram_message_id,
+            "session_id": session_id, # Ensure session_id is included in message object
             "chat_id": message_log.chat_id, "chat_name": message_log.chat_name, "chat_username": message_log.chat_username,
             "sender_id": message_log.sender_id, "sender_name": message_log.sender_name, "sender_username": message_log.sender_username,
             "content": message_log.content, "media_type": message_log.media_type, "timestamp": ts_str
@@ -65,7 +66,14 @@ async def get_messages(session_id: Optional[int] = None, chat_id: Optional[str] 
     if start_date: query = query.where(MessageLog.timestamp >= start_date)
     if end_date: query = query.where(MessageLog.timestamp <= end_date)
     query = query.order_by(desc(MessageLog.timestamp)).offset((page - 1) * limit).limit(limit)
-    return (await db.execute(query)).scalars().all()
+    results = (await db.execute(query)).scalars().all()
+    formatted_results = []
+    for msg in results:
+        ts = msg.timestamp
+        if ts.tzinfo is None: ts = ts.replace(tzinfo=timezone.utc)
+        msg.timestamp = ts
+        formatted_results.append(msg)
+    return formatted_results
 
 @router.get("/groups")
 async def get_groups_history(session_id: Optional[int] = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):

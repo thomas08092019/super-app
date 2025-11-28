@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Radio, Search, Filter, MessageSquare, X, User, Copy, ExternalLink, Users
+  Radio, Search, Filter, ChevronDown, MessageSquare, X, User, Copy, ExternalLink, Users
 } from 'lucide-react';
 import { telegramAPI } from '../services/api';
 import type { Message, TelegramSession } from '../types';
@@ -46,15 +46,20 @@ export default function LiveFeed() {
     loadSessions();
   }, []);
 
+  // Effect 1: Session Change -> Load Groups & Connect WS
+  useEffect(() => {
+    loadGroups();
+    connectAllWebSockets();
+    return () => { if (ws.current) ws.current.close(); };
+  }, [sessionId]);
+
+  // Effect 2: Filters Change -> Fetch Data
   useEffect(() => {
     setMessages([]);
     setPage(1);
     setHasMore(true);
-    loadGroups();
     fetchMessages(1, true);
-    connectAllWebSockets();
-    return () => { if (ws.current) ws.current.close(); };
-  }, [sessionId]);
+  }, [sessionId, selectedGroup]);
 
   useLayoutEffect(() => {
     if (scrollRef.current && prevScrollHeight > 0) {
@@ -87,14 +92,16 @@ export default function LiveFeed() {
       const chatFilter = overrideParams.chat_id !== undefined ? overrideParams.chat_id : selectedGroup;
       const targetSession = sessionId === 0 ? undefined : sessionId;
 
+      const toUTC = (dateStr: string) => dateStr ? new Date(dateStr).toISOString() : undefined;
+
       const data = await telegramAPI.getMessages({
         session_id: targetSession as number,
         page: pageNum,
         limit: 20,
         chat_id: chatFilter || undefined,
         search: searchQuery || undefined,
-        start_date: dateRange.start || undefined,
-        end_date: dateRange.end || undefined
+        start_date: toUTC(dateRange.start),
+        end_date: toUTC(dateRange.end)
       });
 
       if (data.length < 20) setHasMore(false);
@@ -128,12 +135,11 @@ export default function LiveFeed() {
 
         if (isSessionMatch && isGroupMatch) {
           setMessages(prev => [...prev, msg]);
-          if (scrollRef.current) {
-             const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-             if (scrollHeight - scrollTop - clientHeight < 100) {
-                 setTimeout(() => { if(scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 50);
+          setTimeout(() => {
+             if (scrollRef.current) {
+                 scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
              }
-          }
+          }, 50);
         }
       }
     };
@@ -147,8 +153,14 @@ export default function LiveFeed() {
 
   const handleSearch = () => { setPage(1); setHasMore(true); fetchMessages(1, true); };
   const loadMore = () => { const nextPage = page + 1; setPage(nextPage); fetchMessages(nextPage, false); };
-  const handleFilterByGroup = (chatId: string) => { setSelectedGroup(chatId); setPage(1); setHasMore(true); fetchMessages(1, true, { chat_id: chatId }); };
-  const clearGroupFilter = () => { setSelectedGroup(''); setPage(1); setHasMore(true); fetchMessages(1, true, { chat_id: '' }); };
+  
+  const handleFilterByGroup = (chatId: string, newSessionId?: number) => { 
+      if (newSessionId) setSessionId(newSessionId);
+      setSelectedGroup(chatId);
+      // UseEffect will trigger fetch
+  };
+  
+  const clearGroupFilter = () => { setSelectedGroup(''); };
 
   const handleViewProfile = (user: Message) => {
     const query = user.sender_username ? user.sender_username : user.sender_id;
@@ -182,115 +194,49 @@ export default function LiveFeed() {
   const formatTime = (isoString: string) => {
     if (!isoString) return '';
     try {
-      return new Date(isoString).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+      return new Date(isoString).toLocaleString('vi-VN', { 
+        hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' 
+      });
     } catch (e) { return isoString; }
   };
 
-  // Options for CustomSelect
-  const sessionOptions = [
-    { value: 0, label: 'All Accounts' },
-    ...sessions.map(s => ({ value: s.id, label: s.session_name }))
-  ];
-
-  const groupOptions = [
-    { value: '', label: 'All Groups' },
-    ...groups.map(g => ({ value: g.id, label: g.name }))
-  ];
+  const sessionOptions = [{ value: 0, label: 'All Accounts' }, ...sessions.map(s => ({ value: s.id, label: s.session_name }))];
+  const groupOptions = [{ value: '', label: 'All Groups' }, ...groups.map(g => ({ value: g.id, label: g.name }))];
 
   return (
     <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
       <div className="w-80 bg-gray-800 border-r border-gray-700 p-4 flex flex-col gap-4 overflow-y-auto">
         <h2 className="text-xl font-bold flex items-center gap-2"><Filter size={20} /> Filters</h2>
-        
-        <div>
-          <label className="text-sm text-gray-400 mb-1 block">Account</label>
-          <CustomSelect
-            value={sessionId}
-            onChange={(val) => setSessionId(val)}
-            options={sessionOptions}
-            placeholder="Select Account"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm text-gray-400 mb-1 block">Filter by Group</label>
-          <CustomSelect
-            value={selectedGroup}
-            onChange={(val) => setSelectedGroup(val)}
-            options={groupOptions}
-            placeholder="All Groups"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm text-gray-400 mb-1 block">Search Content</label>
-          <div className="relative">
-            <input type="text" className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 pl-8 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Keywords..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
-          </div>
-        </div>
+        <div><label className="text-sm text-gray-400 mb-1 block">Account</label><CustomSelect value={sessionId} onChange={setSessionId} options={sessionOptions} placeholder="Select Account" /></div>
+        <div><label className="text-sm text-gray-400 mb-1 block">Filter by Group</label><CustomSelect value={selectedGroup} onChange={setSelectedGroup} options={groupOptions} placeholder="All Groups" /></div>
+        <div><label className="text-sm text-gray-400 mb-1 block">Search Content</label><div className="relative"><input type="text" className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 pl-8 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Keywords..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /><Search className="absolute left-2 top-2.5 text-gray-400" size={16} /></div></div>
+        <div><label className="text-sm text-gray-400 mb-1 block">Start Time</label><input type="datetime-local" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500 text-xs" /></div>
+        <div><label className="text-sm text-gray-400 mb-1 block">End Time</label><input type="datetime-local" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500 text-xs" /></div>
         <button onClick={handleSearch} className="bg-blue-600 hover:bg-blue-700 p-2 rounded-lg font-bold mt-2">Apply Filters</button>
       </div>
 
       <div className="flex-1 flex flex-col h-full relative">
         <div className="h-16 border-b border-gray-700 flex items-center justify-between px-6 bg-gray-800/50 backdrop-blur">
-          <div className="flex items-center gap-3">
-            <Radio className={connected ? "text-green-500 animate-pulse" : "text-gray-500"} />
-            <div>
-              <h1 className="font-bold text-lg">Live Feed</h1>
-              <p className="text-xs text-gray-400">{connected ? "Real-time updates active" : "Connecting..."}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {selectedGroup && (
-              <div className="flex items-center gap-2 bg-blue-600/20 text-blue-300 px-3 py-1 rounded-full text-sm">
-                <span>Filtering by Group</span>
-                <button onClick={clearGroupFilter} className="hover:text-white"><X size={14} /></button>
-              </div>
-            )}
-            <div className="text-xs text-gray-500">{messages.length} loaded</div>
-          </div>
+          <div className="flex items-center gap-3"><Radio className={connected ? "text-green-500 animate-pulse" : "text-gray-500"} /><div><h1 className="font-bold text-lg">Live Feed</h1><p className="text-xs text-gray-400">{connected ? "Real-time updates active" : "Connecting..."}</p></div></div>
+          <div className="flex items-center gap-4">{selectedGroup && (<div className="flex items-center gap-2 bg-blue-600/20 text-blue-300 px-3 py-1 rounded-full text-sm"><span>Filtering by Group</span><button onClick={clearGroupFilter} className="hover:text-white"><X size={14} /></button></div>)}<div className="text-xs text-gray-500">{messages.length} loaded</div></div>
         </div>
 
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-900/95">
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-900/95 overflow-x-hidden">
           {loading && page > 1 && (<div className="text-center py-2"><span className="text-xs text-blue-400">Loading older messages...</span></div>)}
-          {messages.length === 0 && !loading && (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500"><MessageSquare size={48} className="mb-2 opacity-50" /><p>No messages found</p></div>
-          )}
+          {messages.length === 0 && !loading && (<div className="flex flex-col items-center justify-center h-64 text-gray-500"><MessageSquare size={48} className="mb-2 opacity-50" /><p>No messages found</p></div>)}
 
           {messages.map((msg, idx) => (
             <motion.div key={`${msg.id}-${idx}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4 group hover:bg-gray-800/30 p-2 rounded-lg transition-colors">
-              <div 
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 cursor-pointer hover:ring-2 ring-blue-500 transition-all ${getAvatarColor(msg.sender_name || 'U')}`}
-                onClick={() => setSelectedUser(msg)}
-              >
-                {getInitials(msg.sender_name || 'U')}
-              </div>
-
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 cursor-pointer hover:ring-2 ring-blue-500 transition-all ${getAvatarColor(msg.sender_name || 'U')}`} onClick={() => setSelectedUser(msg)}>{getInitials(msg.sender_name || 'U')}</div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 mb-1">
-                  <span className="font-bold text-blue-300 truncate cursor-pointer hover:underline" onClick={() => setSelectedUser(msg)}>
-                    {msg.sender_name || 'Unknown'}
-                  </span>
-                  
-                  <button 
-                    onClick={() => handleFilterByGroup(msg.chat_id)}
-                    className="text-xs text-gray-400 hover:text-white hover:underline flex items-center gap-1 transition-colors bg-gray-800 px-2 py-0.5 rounded"
-                    title="Click to filter by this group"
-                  >
-                    in {msg.chat_name} <Filter size={10} className="opacity-50" />
-                  </button>
-
-                  <span className="text-xs text-gray-500 ml-auto">{formatTime(msg.timestamp)}</span>
+                <div className="flex items-baseline gap-2 mb-1 min-w-0">
+                  <span className="font-bold text-blue-300 truncate cursor-pointer hover:underline max-w-[200px]" onClick={() => setSelectedUser(msg)}>{msg.sender_name || 'Unknown'}</span>
+                  <button onClick={() => handleFilterByGroup(msg.chat_id, msg.session_id)} className="text-xs text-gray-400 hover:text-white hover:underline flex items-center gap-1 transition-colors bg-gray-800 px-2 py-0.5 rounded truncate max-w-[200px]" title="Click to filter by this group">in {msg.chat_name} <Filter size={10} className="opacity-50 flex-shrink-0" /></button>
+                  <span className="text-xs text-gray-500 ml-auto flex-shrink-0">{formatTime(msg.timestamp)}</span>
                 </div>
-
-                <div className="bg-gray-800 rounded-lg rounded-tl-none p-3 inline-block max-w-3xl border border-gray-700/50">
-                  <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                  {msg.media_type && (
-                    <div className="mt-2 text-xs uppercase bg-black/30 px-2 py-1 rounded w-fit text-blue-300 border border-blue-500/20">
-                      [{msg.media_type}]
-                    </div>
-                  )}
+                <div className="bg-gray-800 rounded-lg rounded-tl-none p-3 inline-block max-w-full border border-gray-700/50">
+                  <p className="whitespace-pre-wrap break-words break-all">{msg.content}</p>
+                  {msg.media_type && (<div className="mt-2 text-xs uppercase bg-black/30 px-2 py-1 rounded w-fit text-blue-300 border border-blue-500/20">[{msg.media_type}]</div>)}
                 </div>
               </div>
             </motion.div>
@@ -300,57 +246,22 @@ export default function LiveFeed() {
 
       <AnimatePresence>
         {selectedUser && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setSelectedUser(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-xl max-w-md w-full border border-gray-700 shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="relative h-24 bg-gradient-to-r from-blue-600 to-purple-600">
-                <button onClick={() => setSelectedUser(null)} className="absolute top-2 right-2 p-1 bg-black/20 rounded-full hover:bg-black/40 transition-colors text-white">
-                  <X size={20} />
-                </button>
-              </div>
-              
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedUser(null)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-gray-800 rounded-xl max-w-md w-full border border-gray-700 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="relative h-24 bg-gradient-to-r from-blue-600 to-purple-600"><button onClick={() => setSelectedUser(null)} className="absolute top-2 right-2 p-1 bg-black/20 rounded-full hover:bg-black/40 transition-colors text-white"><X size={20} /></button></div>
               <div className="px-6 pb-6 relative">
-                <div className={`w-20 h-20 rounded-full border-4 border-gray-800 flex items-center justify-center text-2xl font-bold -mt-10 mb-4 bg-gray-700 text-white ${getAvatarColor(selectedUser.sender_name || 'U')}`}>
-                  {getInitials(selectedUser.sender_name || 'U')}
-                </div>
-                
+                <div className={`w-20 h-20 rounded-full border-4 border-gray-800 flex items-center justify-center text-2xl font-bold -mt-10 mb-4 bg-gray-700 text-white ${getAvatarColor(selectedUser.sender_name || 'U')}`}>{getInitials(selectedUser.sender_name || 'U')}</div>
                 <h2 className="text-2xl font-bold text-white mb-1">{selectedUser.sender_name || 'Unknown User'}</h2>
-                <div className="flex items-center gap-2 text-gray-400 mb-6">
-                  <span>ID: {selectedUser.sender_id}</span>
-                  <button onClick={() => navigator.clipboard.writeText(selectedUser.sender_id || '')} className="hover:text-blue-400" title="Copy ID">
-                    <Copy size={14} />
-                  </button>
-                </div>
-
+                <div className="flex items-center gap-2 text-gray-400 mb-6"><span>ID: {selectedUser.sender_id}</span><button onClick={() => navigator.clipboard.writeText(selectedUser.sender_id || '')} className="hover:text-blue-400" title="Copy ID"><Copy size={14} /></button></div>
                 <div className="space-y-4">
                   <div className="p-3 bg-gray-700/30 rounded-lg">
                     <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Group Context</p>
-                    <div className="flex justify-between items-start">
-                        <div className="overflow-hidden mr-2">
-                            <span className="font-medium text-blue-300 truncate block">{selectedUser.chat_name}</span>
-                            <p className="text-xs text-gray-500 mt-0.5">ID: {selectedUser.chat_id}</p>
-                        </div>
-                        <button onClick={() => {handleFilterByGroup(selectedUser.chat_id); setSelectedUser(null);}} className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors whitespace-nowrap">
-                            Filter
-                        </button>
-                    </div>
+                    <div className="flex justify-between items-start"><div className="overflow-hidden mr-2"><span className="font-medium text-blue-300 truncate block">{selectedUser.chat_name}</span><p className="text-xs text-gray-500 mt-0.5">ID: {selectedUser.chat_id}</p></div><button onClick={() => {handleFilterByGroup(selectedUser.chat_id, selectedUser.session_id); setSelectedUser(null);}} className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors whitespace-nowrap">Filter</button></div>
                     <div className="flex gap-2 mt-3 pt-2 border-t border-gray-700/50">
-                        <button onClick={() => handleViewGroup(selectedUser)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded text-xs font-medium transition-colors">
-                            <Users size={14} /> View Group
-                        </button>
-                        <button onClick={() => handleOpenGroupInTG(selectedUser)} disabled={!selectedUser.chat_username} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium transition-colors ${selectedUser.chat_username ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}`} title={selectedUser.chat_username ? "Open in Telegram" : "No username available"}>
-                            <ExternalLink size={14} /> Open Group
-                        </button>
+                        <button onClick={() => handleViewGroup(selectedUser)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded text-xs font-medium transition-colors"><Users size={14} /> View Group</button>
+                        <button onClick={() => handleOpenGroupInTG(selectedUser)} disabled={!selectedUser.chat_username} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium transition-colors ${selectedUser.chat_username ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}`} title={selectedUser.chat_username ? "Open in Telegram" : "No username available"}><ExternalLink size={14} /> Open Group</button>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-3">
                     <button onClick={() => handleViewProfile(selectedUser)} className="flex items-center justify-center gap-2 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium"><User size={16} /> View Profile</button>
                     <button onClick={() => handleOpenInTG(selectedUser)} className="flex items-center justify-center gap-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors font-medium text-gray-300"><ExternalLink size={16} /> Open User</button>

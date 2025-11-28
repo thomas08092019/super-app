@@ -33,10 +33,13 @@ export interface TelegramSession {
 export interface Message {
   id: number;
   telegram_message_id: number;
+  session_id: number; // Added session_id
   chat_id: string;
   chat_name?: string;
+  chat_username?: string;
   sender_id?: string;
   sender_name?: string;
+  sender_username?: string;
   content?: string;
   media_type?: string;
   media_path?: string;
@@ -62,3 +65,12 @@ export interface BroadcastRequest {
   delay_max?: number;
 }
 
+export interface DumpTask {
+    id: number;
+    task_id: string;
+    status: string;
+    chat_name: string;
+    total_messages: number;
+    progress: number;
+    created_at: string;
+}
