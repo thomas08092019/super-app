@@ -32,7 +32,8 @@ async def start_download(
             request.chat_id,
             request.media_types,
             request.start_time,
-            request.end_time
+            request.end_time,
+            request.limit # Pass limit to task
         ]
     )
     
@@ -144,4 +145,3 @@ async def cancel_download_task(
     await db.commit()
     
     return {"message": "Task cancelled successfully"}
-

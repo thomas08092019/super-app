@@ -158,11 +158,11 @@ export default function Broadcaster() {
             </div>
           </div>
 
-          <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700">
+          <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700 relative z-20">
             <h2 className="text-xl font-semibold mb-4">Target Chats</h2>
             <div className="space-y-3">
               {targetChats.map((chat, index) => (
-                <div key={index} className="flex gap-2">
+                <div key={index} className="flex gap-2 relative" style={{ zIndex: targetChats.length - index }}>
                   <div className="flex-1">
                     <ChatSelector
                       sessionId={sessionId}
@@ -193,7 +193,7 @@ export default function Broadcaster() {
             </div>
           </div>
 
-          <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700">
+          <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700 relative z-10">
             <h2 className="text-xl font-semibold mb-4">Safety Settings</h2>
             <div className="space-y-4">
               <div>
@@ -310,4 +310,3 @@ export default function Broadcaster() {
     </div>
   );
 }
-

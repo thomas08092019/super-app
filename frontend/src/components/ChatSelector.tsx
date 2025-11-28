@@ -72,7 +72,7 @@ export default function ChatSelector({ sessionId, value, onChange, placeholder }
 
       {/* Dropdown */}
       {showDropdown && chats.length > 0 && (
-        <div className="absolute z-10 w-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {chats.map((chat) => (
             <button
               key={chat.id}

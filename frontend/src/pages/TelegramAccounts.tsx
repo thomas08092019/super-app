@@ -1,6 +1,3 @@
-/**
- * Telegram Accounts management page
- */
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Trash2, Phone, Calendar } from 'lucide-react';
@@ -10,6 +7,7 @@ import type { TelegramSession } from '../types';
 export default function TelegramAccounts() {
   const [sessions, setSessions] = useState<TelegramSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loginStep, setLoginStep] = useState<'init' | 'otp' | '2fa'>('init');
   const [formData, setFormData] = useState({
@@ -37,6 +35,7 @@ export default function TelegramAccounts() {
   };
 
   const handleSendCode = async () => {
+    setIsSubmitting(true);
     try {
       await telegramAPI.sendCode({
         session_name: formData.session_name,
@@ -53,10 +52,13 @@ export default function TelegramAccounts() {
       } else {
         alert(errorMsg || 'Failed to send code');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleVerifyCode = async () => {
+    setIsSubmitting(true);
     try {
       const result = await telegramAPI.verifyCode({
         session_name: formData.session_name,
@@ -68,7 +70,6 @@ export default function TelegramAccounts() {
         return;
       }
 
-      // Save session
       await telegramAPI.createSession({
         session_name: formData.session_name,
         phone_number: formData.phone_number,
@@ -82,22 +83,30 @@ export default function TelegramAccounts() {
       loadSessions();
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail;
+      
+      if (typeof errorMsg === 'string' && (errorMsg.includes('SESSION_PASSWORD_NEEDED') || errorMsg.includes('password is required'))) {
+          setLoginStep('2fa');
+          return;
+      }
+
       if (Array.isArray(errorMsg)) {
         alert(errorMsg.map((e: any) => e.msg).join('\n'));
       } else {
         alert(errorMsg || 'Failed to verify code');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleVerify2FA = async () => {
+    setIsSubmitting(true);
     try {
       const result = await telegramAPI.verify2FA({
         session_name: formData.session_name,
         password: formData.password,
       });
 
-      // Save session
       await telegramAPI.createSession({
         session_name: formData.session_name,
         phone_number: formData.phone_number,
@@ -116,6 +125,8 @@ export default function TelegramAccounts() {
       } else {
         alert(errorMsg || 'Failed to verify 2FA');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -158,7 +169,6 @@ export default function TelegramAccounts() {
         </button>
       </motion.div>
 
-      {/* Sessions grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sessions.map((session, index) => (
           <motion.div
@@ -208,7 +218,6 @@ export default function TelegramAccounts() {
         )}
       </div>
 
-      {/* Add Account Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <motion.div
@@ -228,6 +237,7 @@ export default function TelegramAccounts() {
                     setFormData({ ...formData, session_name: e.target.value })
                   }
                   className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSubmitting}
                 />
                 <input
                   type="tel"
@@ -237,6 +247,7 @@ export default function TelegramAccounts() {
                     setFormData({ ...formData, phone_number: e.target.value })
                   }
                   className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSubmitting}
                 />
                 <input
                   type="text"
@@ -244,6 +255,7 @@ export default function TelegramAccounts() {
                   value={formData.api_id}
                   onChange={(e) => setFormData({ ...formData, api_id: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSubmitting}
                 />
                 <input
                   type="text"
@@ -251,12 +263,18 @@ export default function TelegramAccounts() {
                   value={formData.api_hash}
                   onChange={(e) => setFormData({ ...formData, api_hash: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="submit"
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Send Code
+                  {isSubmitting ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Send Code"
+                  )}
                 </button>
               </form>
             )}
@@ -272,12 +290,18 @@ export default function TelegramAccounts() {
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="submit"
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Verify Code
+                  {isSubmitting ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Verify Code"
+                  )}
                 </button>
               </form>
             )}
@@ -291,12 +315,18 @@ export default function TelegramAccounts() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="submit"
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Verify 2FA
+                  {isSubmitting ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Verify 2FA"
+                  )}
                 </button>
               </form>
             )}
@@ -306,7 +336,8 @@ export default function TelegramAccounts() {
                 setShowAddModal(false);
                 setLoginStep('init');
               }}
-              className="w-full mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+              disabled={isSubmitting}
+              className="w-full mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
@@ -316,4 +347,3 @@ export default function TelegramAccounts() {
     </div>
   );
 }
-

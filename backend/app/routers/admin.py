@@ -1,33 +1,47 @@
-"""
-Admin panel router
-Admin-only endpoints for user management
-"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from typing import List
 from app.database import get_db
-from app.models import User
+from app.models import User, TelegramSession, MessageLog, DownloadedFile, DownloadTask
 from app.schemas import UserResponse, UserUpdateStatus, ResetPasswordRequest
 from app.dependencies import get_admin_user
 from app.auth import hash_password
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
 
+@router.get("/stats")
+async def get_dashboard_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    sessions_query = select(func.count()).select_from(TelegramSession).where(TelegramSession.is_active == True)
+    sessions_count = await db.scalar(sessions_query)
+
+    messages_query = select(func.count()).select_from(MessageLog)
+    messages_count = await db.scalar(messages_query)
+
+    files_query = select(func.count()).select_from(DownloadedFile)
+    files_count = await db.scalar(files_query)
+
+    tasks_query = select(func.count()).select_from(DownloadTask).where(DownloadTask.status.in_(['pending', 'running']))
+    tasks_count = await db.scalar(tasks_query)
+
+    return {
+        "active_sessions": sessions_count or 0,
+        "total_messages": messages_count or 0,
+        "total_files": files_count or 0,
+        "active_tasks": tasks_count or 0
+    }
 
 @router.get("/users", response_model=List[UserResponse])
 async def list_users(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user)
 ):
-    """
-    List all users in the system
-    Admin access required
-    """
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     users = result.scalars().all()
     return users
-
 
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(
@@ -35,21 +49,13 @@ async def get_user(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user)
 ):
-    """
-    Get specific user details
-    Admin access required
-    """
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
     return user
-
 
 @router.patch("/users/{user_id}/status", response_model=UserResponse)
 async def update_user_status(
@@ -58,32 +64,20 @@ async def update_user_status(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user)
 ):
-    """
-    Ban or unban a user
-    Admin access required
-    """
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    # Prevent admin from banning themselves
     if user.id == admin.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot change your own status"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change your own status")
     
     user.status = status_update.status
     await db.commit()
     await db.refresh(user)
     
     return user
-
 
 @router.post("/users/{user_id}/reset-password")
 async def reset_user_password(
@@ -92,18 +86,11 @@ async def reset_user_password(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user)
 ):
-    """
-    Force reset a user's password
-    Admin access required
-    """
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
     user.hashed_password = hash_password(reset_request.new_password)
     await db.commit()
@@ -113,27 +100,18 @@ async def reset_user_password(
         "user_id": user_id
     }
 
-
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user)
 ):
-    """
-    Delete a user account
-    Admin access required
-    """
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    # Prevent admin from deleting themselves
     if user.id == admin.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -147,4 +125,3 @@ async def delete_user(
         "message": "User deleted successfully",
         "user_id": user_id
     }
-

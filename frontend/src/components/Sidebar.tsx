@@ -1,7 +1,7 @@
 /**
  * Collapsible sidebar navigation component
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -17,6 +17,7 @@ import {
   LogOut,
   Menu,
   X,
+  Folder
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
@@ -45,6 +46,7 @@ const menuItems: MenuItem[] = [
       { name: 'Live Feed', path: '/telegram/feed', icon: Radio },
       { name: 'AI Summary', path: '/telegram/summary', icon: Bot },
       { name: 'Data Miner', path: '/telegram/downloader', icon: Database },
+      { name: 'File Manager', path: '/telegram/files', icon: Folder },
       { name: 'OSINT Tools', path: '/telegram/osint', icon: Search },
       { name: 'Broadcaster', path: '/telegram/broadcast', icon: Radio },
     ],
@@ -56,6 +58,23 @@ export default function Sidebar() {
   const [expandedItems, setExpandedItems] = useState<string[]>(['System', 'Telegram']);
   const location = useLocation();
   const { user, logout } = useAuthStore();
+
+  // FIX: Auto-open sidebar when resizing to desktop view
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) { // 1024px is Tailwind's 'lg' breakpoint
+        setIsOpen(true);
+      } else {
+        setIsOpen(false);
+      }
+    };
+
+    // Initial check
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const toggleExpand = (name: string) => {
     setExpandedItems((prev) =>
@@ -75,14 +94,14 @@ export default function Sidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 left-4 z-50 lg:hidden bg-gray-800 p-2 rounded-lg"
+        className="fixed top-4 left-4 z-50 lg:hidden bg-gray-800 p-2 rounded-lg text-white hover:bg-gray-700 transition-colors"
       >
         {isOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
       {/* Sidebar */}
       <motion.aside
-        initial={{ x: -300 }}
+        initial={false}
         animate={{ x: isOpen ? 0 : -300 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         className="fixed left-0 top-0 h-screen w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-40"
@@ -96,7 +115,7 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
           {menuItems.map((item) => (
             <div key={item.name}>
               {/* Parent item */}
@@ -156,17 +175,17 @@ export default function Sidebar() {
         {/* User section */}
         <div className="p-4 border-t border-gray-800">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-semibold">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-semibold text-white">
               {user?.email[0].toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.email}</p>
+              <p className="text-sm font-medium truncate text-white">{user?.email}</p>
               <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-white"
           >
             <LogOut size={18} />
             <span>Logout</span>
@@ -184,4 +203,3 @@ export default function Sidebar() {
     </>
   );
 }
-

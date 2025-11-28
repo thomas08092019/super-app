@@ -9,19 +9,16 @@ from app.database import Base
 
 
 class UserRole(str, enum.Enum):
-    """User role enumeration"""
     ADMIN = "admin"
     USER = "user"
 
 
 class UserStatus(str, enum.Enum):
-    """User status enumeration"""
     ACTIVE = "active"
     BANNED = "banned"
 
 
 class User(Base):
-    """User model for authentication and authorization"""
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -32,40 +29,38 @@ class User(Base):
     status = Column(Enum(UserStatus), default=UserStatus.ACTIVE, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
-    # Relationships
     telegram_sessions = relationship("TelegramSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class TelegramSession(Base):
-    """Telegram session storage for multi-account support"""
     __tablename__ = "telegram_sessions"
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     session_name = Column(String(100), nullable=False)
-    session_string = Column(Text, nullable=False)  # Encrypted session string
+    session_string = Column(Text, nullable=False)
     phone_number = Column(String(20), nullable=False)
     api_id = Column(String(50), nullable=False)
     api_hash = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
-    # Relationships
     user = relationship("User", back_populates="telegram_sessions")
 
 
 class MessageLog(Base):
-    """Message logs for storing Telegram messages"""
     __tablename__ = "message_logs"
     
     id = Column(Integer, primary_key=True, index=True)
     telegram_message_id = Column(Integer, nullable=False)
     chat_id = Column(String(100), nullable=False, index=True)
     chat_name = Column(String(255), nullable=True)
+    chat_username = Column(String(255), nullable=True) # Added
     sender_id = Column(String(100), nullable=True)
     sender_name = Column(String(255), nullable=True)
+    sender_username = Column(String(255), nullable=True) # Added
     content = Column(Text, nullable=True)
-    media_type = Column(String(50), nullable=True)  # photo, video, document, sticker, etc.
+    media_type = Column(String(50), nullable=True)
     media_path = Column(String(500), nullable=True)
     timestamp = Column(DateTime, nullable=False, index=True)
     session_id = Column(Integer, ForeignKey("telegram_sessions.id", ondelete="CASCADE"))
@@ -73,7 +68,6 @@ class MessageLog(Base):
 
 
 class DownloadTask(Base):
-    """Track download tasks for media"""
     __tablename__ = "download_tasks"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -81,12 +75,26 @@ class DownloadTask(Base):
     session_id = Column(Integer, ForeignKey("telegram_sessions.id", ondelete="CASCADE"), nullable=False)
     chat_id = Column(String(100), nullable=False)
     chat_name = Column(String(255), nullable=True)
-    task_id = Column(String(100), unique=True, nullable=False)  # Celery task ID
-    status = Column(String(20), default="pending")  # pending, running, completed, failed
+    task_id = Column(String(100), unique=True, nullable=False)
+    status = Column(String(20), default="pending")
     total_files = Column(Integer, default=0)
     downloaded_files = Column(Integer, default=0)
-    progress = Column(Integer, default=0)  # Percentage
+    progress = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
 
+
+class DownloadedFile(Base):
+    __tablename__ = "downloaded_files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("telegram_sessions.id", ondelete="CASCADE"), nullable=False)
+    chat_id = Column(String(100), nullable=False, index=True)
+    chat_name = Column(String(255), nullable=True)
+    message_id = Column(Integer, nullable=True)
+    file_name = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False, unique=True)
+    file_type = Column(String(50), nullable=True)
+    file_size = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -1,6 +1,3 @@
-/**
- * Main App component with routing
- */
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
@@ -14,8 +11,8 @@ import AISummary from './pages/AISummary';
 import Downloader from './pages/Downloader';
 import OSINT from './pages/OSINT';
 import Broadcaster from './pages/Broadcaster';
+import FileManager from './pages/FileManager';
 
-// Protected route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
   
@@ -26,7 +23,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Admin-only route wrapper
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuthStore();
   
@@ -41,7 +37,6 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Layout with sidebar
 function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gray-900 text-white">
@@ -71,10 +66,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes */}
         <Route path="/login" element={<Login />} />
         
-        {/* Protected routes */}
         <Route
           path="/dashboard"
           element={
@@ -86,7 +79,6 @@ function App() {
           }
         />
         
-        {/* Admin routes */}
         <Route
           path="/admin/users"
           element={
@@ -98,7 +90,6 @@ function App() {
           }
         />
         
-        {/* Telegram routes */}
         <Route
           path="/telegram/accounts"
           element={
@@ -142,6 +133,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/telegram/files"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <FileManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         
         <Route
           path="/telegram/osint"
@@ -165,7 +167,6 @@ function App() {
           }
         />
         
-        {/* Default redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
@@ -174,4 +175,3 @@ function App() {
 }
 
 export default App;
-

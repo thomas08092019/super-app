@@ -9,7 +9,7 @@ from datetime import datetime
 from app.models import UserRole, UserStatus
 
 
-# User Schemas (defined first for forward reference)
+# User Schemas
 class UserResponse(BaseModel):
     id: int
     username: Optional[str]
@@ -83,8 +83,10 @@ class MessageResponse(BaseModel):
     telegram_message_id: int
     chat_id: str
     chat_name: Optional[str]
+    chat_username: Optional[str] # Added
     sender_id: Optional[str]
     sender_name: Optional[str]
+    sender_username: Optional[str] # Added
     content: Optional[str]
     media_type: Optional[str]
     media_path: Optional[str]
@@ -114,7 +116,9 @@ class DownloadRequest(BaseModel):
     chat_id: str
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    # Added 'audio' and 'archive' to default but frontend can override
     media_types: List[str] = ["photo", "video", "document"]
+    limit: Optional[int] = None
 
 
 class DownloadTaskResponse(BaseModel):
@@ -165,4 +169,3 @@ class BroadcastResponse(BaseModel):
     task_id: str
     total_targets: int
     status: str
-

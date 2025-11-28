@@ -1,48 +1,56 @@
-/**
- * Dashboard page component
- */
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, MessageSquare, Database, Activity } from 'lucide-react';
+import { Users, MessageSquare, Database, Activity, FileText } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { telegramAPI } from '../services/api';
+import { adminAPI } from '../services/api';
 
 export default function Dashboard() {
   const { user } = useAuthStore();
-  const [sessions, setSessions] = useState([]);
+  const [stats, setStats] = useState({
+    active_sessions: 0,
+    total_messages: 0,
+    total_files: 0,
+    active_tasks: 0
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSessions();
+    loadStats();
   }, []);
 
-  const loadSessions = async () => {
+  const loadStats = async () => {
     try {
-      const data = await telegramAPI.getSessions();
-      setSessions(data);
+      const data = await adminAPI.getDashboardStats();
+      setStats(data);
     } catch (error) {
-      console.error('Failed to load sessions:', error);
+      console.error('Failed to load stats:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const stats = [
+  const statCards = [
     {
       name: 'Active Sessions',
-      value: sessions.length,
+      value: stats.active_sessions,
       icon: MessageSquare,
       color: 'from-blue-500 to-blue-600',
     },
     {
       name: 'Total Messages',
-      value: '0',
+      value: stats.total_messages.toLocaleString(),
       icon: Database,
       color: 'from-purple-500 to-purple-600',
     },
     {
+      name: 'Downloaded Files',
+      value: stats.total_files.toLocaleString(),
+      icon: FileText,
+      color: 'from-yellow-500 to-orange-600',
+    },
+    {
       name: 'Active Tasks',
-      value: '0',
+      value: stats.active_tasks,
       icon: Activity,
       color: 'from-green-500 to-green-600',
     },
@@ -50,27 +58,25 @@ export default function Dashboard() {
 
   return (
     <div className="p-8">
-      {/* Welcome section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
         <h1 className="text-3xl font-bold mb-2">
-          Welcome back, {user?.email.split('@')[0]}!
+          Welcome back, {user?.username || user?.email.split('@')[0]}!
         </h1>
-        <p className="text-gray-400">Here's what's happening with your Telegram accounts</p>
+        <p className="text-gray-400">System overview and statistics</p>
       </motion.div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {stats.map((stat, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {statCards.map((stat, index) => (
           <motion.div
             key={stat.name}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700"
+            className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700 hover:border-gray-500 transition-colors"
           >
             <div className="flex items-center justify-between mb-4">
               <div
@@ -79,13 +85,14 @@ export default function Dashboard() {
                 <stat.icon size={24} className="text-white" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold mb-1">{stat.value}</h3>
+            <h3 className="text-2xl font-bold mb-1">
+              {loading ? '...' : stat.value}
+            </h3>
             <p className="text-sm text-gray-400">{stat.name}</p>
           </motion.div>
         ))}
       </div>
 
-      {/* Quick actions */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -111,30 +118,15 @@ export default function Dashboard() {
             <p className="text-sm text-gray-400">Monitor real-time messages</p>
           </a>
           <a
-            href="/telegram/summary"
+            href="/telegram/downloader"
             className="p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors group"
           >
-            <MessageSquare size={24} className="text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
-            <h3 className="font-medium mb-1">AI Summary</h3>
-            <p className="text-sm text-gray-400">Summarize conversations with AI</p>
+            <Database size={24} className="text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+            <h3 className="font-medium mb-1">Data Miner</h3>
+            <p className="text-sm text-gray-400">Download media from chats</p>
           </a>
-        </div>
-      </motion.div>
-
-      {/* Recent activity */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="mt-8 bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700"
-      >
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-        <div className="text-center py-8 text-gray-400">
-          <Activity size={48} className="mx-auto mb-4 opacity-50" />
-          <p>No recent activity to display</p>
         </div>
       </motion.div>
     </div>
   );
 }
-
