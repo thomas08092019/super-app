@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Radio, Search, Filter, ChevronDown, MessageSquare, X, User, Copy, ExternalLink, Users
+  Radio, Search, Filter, MessageSquare, X, User, Copy, ExternalLink, Users
 } from 'lucide-react';
 import { telegramAPI } from '../services/api';
 import type { Message, TelegramSession } from '../types';
+import CustomSelect from '../components/CustomSelect';
 
 interface GroupOption {
   id: string;
@@ -151,32 +152,22 @@ export default function LiveFeed() {
 
   const handleViewProfile = (user: Message) => {
     const query = user.sender_username ? user.sender_username : user.sender_id;
-    if (query) {
-      navigate('/telegram/osint', { state: { query, type: 'profile' } });
-    }
+    if (query) navigate('/telegram/osint', { state: { query, type: 'profile' } });
   };
 
   const handleViewGroup = (user: Message) => {
     const query = user.chat_username ? user.chat_username : user.chat_id;
-    if (query) {
-        navigate('/telegram/osint', { state: { query, type: 'group' } });
-    }
+    if (query) navigate('/telegram/osint', { state: { query, type: 'group' } });
   };
 
   const handleOpenInTG = (user: Message) => {
-    if (user.sender_username) {
-        window.open(`https://t.me/${user.sender_username}`, '_blank');
-    } else if (user.sender_id) {
-        window.open(`tg://user?id=${user.sender_id}`, '_blank');
-    }
+    if (user.sender_username) window.open(`https://t.me/${user.sender_username}`, '_blank');
+    else if (user.sender_id) window.open(`tg://user?id=${user.sender_id}`, '_blank');
   };
 
   const handleOpenGroupInTG = (user: Message) => {
-    if (user.chat_username) {
-        window.open(`https://t.me/${user.chat_username}`, '_blank');
-    } else {
-        alert('Cannot open private group directly without a username link.');
-    }
+    if (user.chat_username) window.open(`https://t.me/${user.chat_username}`, '_blank');
+    else alert('Cannot open private group directly without a username link.');
   };
 
   const getAvatarColor = (name: string) => {
@@ -195,42 +186,52 @@ export default function LiveFeed() {
     } catch (e) { return isoString; }
   };
 
+  // Options for CustomSelect
+  const sessionOptions = [
+    { value: 0, label: 'All Accounts' },
+    ...sessions.map(s => ({ value: s.id, label: s.session_name }))
+  ];
+
+  const groupOptions = [
+    { value: '', label: 'All Groups' },
+    ...groups.map(g => ({ value: g.id, label: g.name }))
+  ];
+
   return (
     <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
-      {/* Sidebar Filters */}
       <div className="w-80 bg-gray-800 border-r border-gray-700 p-4 flex flex-col gap-4 overflow-y-auto">
         <h2 className="text-xl font-bold flex items-center gap-2"><Filter size={20} /> Filters</h2>
+        
         <div>
           <label className="text-sm text-gray-400 mb-1 block">Account</label>
-          <div className="relative">
-            <select className="w-full bg-gray-700 rounded-lg p-2 appearance-none outline-none" value={sessionId} onChange={(e) => setSessionId(Number(e.target.value))}>
-              <option value={0}>All Accounts</option>
-              {sessions.map(s => (<option key={s.id} value={s.id}>{s.session_name}</option>))}
-            </select>
-            <ChevronDown className="absolute right-2 top-3 pointer-events-none" size={16} />
-          </div>
+          <CustomSelect
+            value={sessionId}
+            onChange={(val) => setSessionId(val)}
+            options={sessionOptions}
+            placeholder="Select Account"
+          />
         </div>
+
         <div>
           <label className="text-sm text-gray-400 mb-1 block">Filter by Group</label>
-          <div className="relative">
-            <select className="w-full bg-gray-700 rounded-lg p-2 appearance-none outline-none" value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
-              <option value="">All Groups</option>
-              {groups.map(g => (<option key={g.id} value={g.id}>{g.name}</option>))}
-            </select>
-            <ChevronDown className="absolute right-2 top-3 pointer-events-none" size={16} />
-          </div>
+          <CustomSelect
+            value={selectedGroup}
+            onChange={(val) => setSelectedGroup(val)}
+            options={groupOptions}
+            placeholder="All Groups"
+          />
         </div>
+
         <div>
           <label className="text-sm text-gray-400 mb-1 block">Search Content</label>
           <div className="relative">
-            <input type="text" className="w-full bg-gray-700 rounded-lg p-2 pl-8 outline-none" placeholder="Keywords..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <input type="text" className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 pl-8 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Keywords..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
           </div>
         </div>
         <button onClick={handleSearch} className="bg-blue-600 hover:bg-blue-700 p-2 rounded-lg font-bold mt-2">Apply Filters</button>
       </div>
 
-      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col h-full relative">
         <div className="h-16 border-b border-gray-700 flex items-center justify-between px-6 bg-gray-800/50 backdrop-blur">
           <div className="flex items-center gap-3">
@@ -329,7 +330,6 @@ export default function LiveFeed() {
                 </div>
 
                 <div className="space-y-4">
-                  {/* Group Context Section */}
                   <div className="p-3 bg-gray-700/30 rounded-lg">
                     <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Group Context</p>
                     <div className="flex justify-between items-start">
@@ -341,39 +341,19 @@ export default function LiveFeed() {
                             Filter
                         </button>
                     </div>
-                    
                     <div className="flex gap-2 mt-3 pt-2 border-t border-gray-700/50">
-                        <button 
-                            onClick={() => handleViewGroup(selectedUser)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded text-xs font-medium transition-colors"
-                        >
+                        <button onClick={() => handleViewGroup(selectedUser)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded text-xs font-medium transition-colors">
                             <Users size={14} /> View Group
                         </button>
-                        <button 
-                            onClick={() => handleOpenGroupInTG(selectedUser)}
-                            disabled={!selectedUser.chat_username}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium transition-colors ${selectedUser.chat_username ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}`}
-                            title={selectedUser.chat_username ? "Open in Telegram" : "No username available"}
-                        >
+                        <button onClick={() => handleOpenGroupInTG(selectedUser)} disabled={!selectedUser.chat_username} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium transition-colors ${selectedUser.chat_username ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}`} title={selectedUser.chat_username ? "Open in Telegram" : "No username available"}>
                             <ExternalLink size={14} /> Open Group
                         </button>
                     </div>
                   </div>
 
-                  {/* User Actions */}
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
-                        onClick={() => handleViewProfile(selectedUser)}
-                        className="flex items-center justify-center gap-2 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium"
-                    >
-                        <User size={16} /> View Profile
-                    </button>
-                    <button 
-                        onClick={() => handleOpenInTG(selectedUser)}
-                        className="flex items-center justify-center gap-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors font-medium text-gray-300"
-                    >
-                        <ExternalLink size={16} /> Open User
-                    </button>
+                    <button onClick={() => handleViewProfile(selectedUser)} className="flex items-center justify-center gap-2 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium"><User size={16} /> View Profile</button>
+                    <button onClick={() => handleOpenInTG(selectedUser)} className="flex items-center justify-center gap-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors font-medium text-gray-300"><ExternalLink size={16} /> Open User</button>
                   </div>
                 </div>
               </div>

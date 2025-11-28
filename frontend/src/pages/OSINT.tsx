@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom'; // IMPORT THIS
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, User, Users, Shield, AlertCircle } from 'lucide-react';
 import { telegramAPI } from '../services/api';
 import type { TelegramSession } from '../types';
+import CustomSelect from '../components/CustomSelect';
 
 export default function OSINT() {
-  const location = useLocation(); // USE HOOK
+  const location = useLocation();
   const [sessions, setSessions] = useState<TelegramSession[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [searchType, setSearchType] = useState<'profile' | 'group'>('profile');
@@ -19,26 +20,21 @@ export default function OSINT() {
     loadSessions();
   }, []);
 
-  // AUTO SEARCH EFFECT
   useEffect(() => {
     if (location.state && sessions.length > 0) {
         const { query, type } = location.state as { query: string, type: 'profile' | 'group' };
         if (query) {
             setSearchQuery(query);
             setSearchType(type || 'profile');
-            // Auto select first session if none selected
             if (!sessionId) setSessionId(sessions[0].id);
-            
-            // Only trigger if we have a session
             if (sessionId || sessions.length > 0) {
-                // Short timeout to allow state updates
                 setTimeout(() => {
                     handleSearch(query, type, sessionId || sessions[0].id);
                 }, 100);
             }
         }
     }
-  }, [location.state, sessions]); // Run when sessions load
+  }, [location.state, sessions]);
 
   const loadSessions = async () => {
     try {
@@ -82,9 +78,10 @@ export default function OSINT() {
     }
   };
 
+  const sessionOptions = sessions.map(s => ({ value: s.id, label: s.session_name }));
+
   return (
     <div className="p-8">
-      {/* ... (Render code remains the same as previous) ... */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
           <Search className="text-blue-500" /> OSINT Tools
@@ -97,9 +94,12 @@ export default function OSINT() {
              <div className="space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Telegram Session</label>
-                    <select value={sessionId || ''} onChange={(e) => setSessionId(Number(e.target.value))} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        {sessions.map((s) => <option key={s.id} value={s.id}>{s.session_name}</option>)}
-                    </select>
+                    <CustomSelect
+                        value={sessionId || ''}
+                        onChange={(val) => setSessionId(val)}
+                        options={sessionOptions}
+                        placeholder="Select Account"
+                    />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Search Type</label>
@@ -110,7 +110,7 @@ export default function OSINT() {
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">{searchType === 'profile' ? 'Username or Phone' : 'Group Link or Username'}</label>
-                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={searchType === 'profile' ? '@username or +1234567890' : '@groupname or t.me/groupname'} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={searchType === 'profile' ? '@username or +1234567890' : '@groupname or t.me/groupname'} className="w-full bg-gray-900 border border-gray-600 rounded-lg pl-4 pr-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white" />
                 </div>
                 <button onClick={() => handleSearch()} disabled={loading || !sessionId || !searchQuery} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Search size={20} /> Search</>}
@@ -129,7 +129,7 @@ export default function OSINT() {
             searchType === 'profile' ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-4 pb-4 border-b border-gray-700">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-2xl font-bold">
+                  <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-2xl font-bold">
                     {result.first_name?.[0] || '?'}
                   </div>
                   <div>
@@ -138,7 +138,7 @@ export default function OSINT() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {result.user_id && <div><p className="text-sm text-gray-400">User ID</p><p className="font-mono">{result.user_id}</p></div>}
+                  {result.user_id && <div><p className="text-sm text-gray-400">ID</p><p className="font-mono">{result.user_id}</p></div>}
                   {result.phone && <div><p className="text-sm text-gray-400">Phone</p><p>{result.phone}</p></div>}
                   {result.bio && <div><p className="text-sm text-gray-400">Bio</p><p className="text-sm">{result.bio}</p></div>}
                   {result.dc_id && <div><p className="text-sm text-gray-400">Data Center</p><p>DC{result.dc_id}</p></div>}
@@ -148,7 +148,7 @@ export default function OSINT() {
             ) : (
               <div className="space-y-4">
                  <div className="flex items-center gap-4 pb-4 border-b border-gray-700">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center"><Users size={32} /></div>
+                  <div className="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center"><Users size={32} /></div>
                   <div>
                     <h3 className="text-xl font-bold flex items-center gap-2">
                         {result.title}

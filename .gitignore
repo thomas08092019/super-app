@@ -64,3 +64,6 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Folder for uploaded files
+exports/

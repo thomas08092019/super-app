@@ -69,10 +69,12 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
       - MINIO_BUCKET_NAME=superapp-media
       - MINIO_SECURE=False
+      - MINIO_PUBLIC_ENDPOINT=localhost:9000
     volumes:
       - ./backend:/app
       - media_storage:/app/media
       - sessions_storage:/app/sessions
+      - ./exports:/app/exports
     ports:
       - "8000:8000"
     networks:
@@ -108,13 +110,14 @@ services:
       - ./backend:/app
       - media_storage:/app/media
       - sessions_storage:/app/sessions
+      - ./exports:/app/exports
     networks:
       - superapp_network
     depends_on:
       - redis
       - db
       - minio
-    command: celery -A app.celery_worker worker --loglevel=info
+    command: watchmedo auto-restart --directory=./app --pattern=*.py --recursive -- celery -A app.celery_worker worker --loglevel=info
 
   frontend:
     build:

@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Plus, Trash2, Phone, Calendar } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Trash2, Phone, Calendar, Info, ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react';
 import { telegramAPI } from '../services/api';
 import type { TelegramSession } from '../types';
+
+const INITIAL_FORM_STATE = {
+  session_name: '',
+  phone_number: '',
+  api_id: '',
+  api_hash: '',
+  code: '',
+  password: '',
+};
 
 export default function TelegramAccounts() {
   const [sessions, setSessions] = useState<TelegramSession[]>([]);
@@ -10,14 +19,8 @@ export default function TelegramAccounts() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loginStep, setLoginStep] = useState<'init' | 'otp' | '2fa'>('init');
-  const [formData, setFormData] = useState({
-    session_name: '',
-    phone_number: '',
-    api_id: '',
-    api_hash: '',
-    code: '',
-    password: '',
-  });
+  const [showGuide, setShowGuide] = useState(false);
+  const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
   useEffect(() => {
     loadSessions();
@@ -32,6 +35,21 @@ export default function TelegramAccounts() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenModal = () => {
+    setFormData(INITIAL_FORM_STATE);
+    setLoginStep('init');
+    setShowGuide(false);
+    setIsSubmitting(false);
+    setShowAddModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    setFormData(INITIAL_FORM_STATE);
+    setLoginStep('init');
+    setIsSubmitting(false);
   };
 
   const handleSendCode = async () => {
@@ -79,16 +97,14 @@ export default function TelegramAccounts() {
       });
 
       alert('Login successful!');
-      setShowAddModal(false);
+      handleCloseModal();
       loadSessions();
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail;
-      
       if (typeof errorMsg === 'string' && (errorMsg.includes('SESSION_PASSWORD_NEEDED') || errorMsg.includes('password is required'))) {
           setLoginStep('2fa');
           return;
       }
-
       if (Array.isArray(errorMsg)) {
         alert(errorMsg.map((e: any) => e.msg).join('\n'));
       } else {
@@ -116,7 +132,7 @@ export default function TelegramAccounts() {
       });
 
       alert('Login successful!');
-      setShowAddModal(false);
+      handleCloseModal();
       loadSessions();
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail;
@@ -132,7 +148,6 @@ export default function TelegramAccounts() {
 
   const handleDeleteSession = async (sessionId: number) => {
     if (!confirm('Are you sure you want to remove this account?')) return;
-
     try {
       await telegramAPI.deleteSession(sessionId);
       loadSessions();
@@ -151,64 +166,30 @@ export default function TelegramAccounts() {
 
   return (
     <div className="p-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8 flex items-center justify-between"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2">Telegram Accounts</h1>
           <p className="text-gray-400">Manage your Telegram sessions</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-        >
-          <Plus size={20} />
-          Add Account
+        <button onClick={handleOpenModal} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+          <Plus size={20} /> Add Account
         </button>
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sessions.map((session, index) => (
-          <motion.div
-            key={session.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700 relative"
-          >
+          <motion.div key={session.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700 relative">
             <div className="mb-4">
               <h3 className="text-lg font-semibold mb-2">{session.session_name}</h3>
-              <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
-                <Phone size={16} />
-                <span>{session.phone_number}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-gray-400">
-                <Calendar size={16} />
-                <span>{new Date(session.created_at).toLocaleDateString()}</span>
-              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-400 mb-1"><Phone size={16} /><span>{session.phone_number}</span></div>
+              <div className="flex items-center gap-2 text-sm text-gray-400"><Calendar size={16} /><span>{new Date(session.created_at).toLocaleDateString()}</span></div>
             </div>
             <div className="flex items-center justify-between">
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  session.is_active
-                    ? 'bg-green-500/20 text-green-300'
-                    : 'bg-gray-500/20 text-gray-300'
-                }`}
-              >
-                {session.is_active ? 'Active' : 'Inactive'}
-              </span>
-              <button
-                onClick={() => handleDeleteSession(session.id)}
-                className="p-2 hover:bg-red-600/20 text-red-400 rounded-lg transition-colors"
-              >
-                <Trash2 size={18} />
-              </button>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${session.is_active ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'}`}>{session.is_active ? 'Active' : 'Inactive'}</span>
+              <button onClick={() => handleDeleteSession(session.id)} className="p-2 hover:bg-red-600/20 text-red-400 rounded-lg transition-colors"><Trash2 size={18} /></button>
             </div>
           </motion.div>
         ))}
-
         {sessions.length === 0 && (
           <div className="col-span-full text-center py-12 text-gray-400">
             <Phone size={48} className="mx-auto mb-4 opacity-50" />
@@ -220,88 +201,56 @@ export default function TelegramAccounts() {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-800 rounded-xl p-6 max-w-md w-full border border-gray-700"
-          >
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-gray-800 rounded-xl p-6 max-w-md w-full border border-gray-700 max-h-[90vh] overflow-y-auto custom-scrollbar relative">
+            <button onClick={handleCloseModal} className="absolute top-4 right-4 p-1 text-gray-400 hover:text-white transition-colors"><X size={20} /></button>
+            
             <h2 className="text-2xl font-bold mb-4">Add Telegram Account</h2>
-
+            
             {loginStep === 'init' && (
-              <form onSubmit={(e) => { e.preventDefault(); handleSendCode(); }} className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Session Name"
-                  value={formData.session_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, session_name: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isSubmitting}
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone Number (+1234567890)"
-                  value={formData.phone_number}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone_number: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isSubmitting}
-                />
-                <input
-                  type="text"
-                  placeholder="API ID"
-                  value={formData.api_id}
-                  onChange={(e) => setFormData({ ...formData, api_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isSubmitting}
-                />
-                <input
-                  type="text"
-                  placeholder="API Hash"
-                  value={formData.api_hash}
-                  onChange={(e) => setFormData({ ...formData, api_hash: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              <div className="mb-4">
+                <button 
+                    onClick={() => setShowGuide(!showGuide)}
+                    className="flex items-center justify-between w-full p-3 bg-blue-900/20 text-blue-300 rounded-lg border border-blue-800 hover:bg-blue-900/30 transition-colors text-sm mb-4"
                 >
-                  {isSubmitting ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    "Send Code"
-                  )}
+                    <div className="flex items-center gap-2">
+                        <Info size={16} />
+                        <span className="font-semibold">How to get API ID & Hash?</span>
+                    </div>
+                    {showGuide ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
-              </form>
+                
+                <AnimatePresence>
+                    {showGuide && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                            <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 text-sm text-gray-300 space-y-2 mb-4">
+                                <p>1. Log in to <a href="https://my.telegram.org" target="_blank" className="text-blue-400 hover:underline inline-flex items-center gap-1">my.telegram.org <ExternalLink size={10} /></a></p>
+                                <p>2. Click on <strong>API Development tools</strong>.</p>
+                                <p>3. Create a new application.</p>
+                                <p>4. Copy <strong>App api_id</strong> and <strong>App api_hash</strong>.</p>
+                                <div className="p-2 bg-yellow-900/20 text-yellow-200 text-xs rounded border border-yellow-700/30 mt-2">⚠️ Keep these credentials secret.</div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <form onSubmit={(e) => { e.preventDefault(); handleSendCode(); }} className="space-y-4">
+                    <input type="text" placeholder="Session Name (e.g. Personal)" value={formData.session_name} onChange={(e) => setFormData({ ...formData, session_name: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" disabled={isSubmitting} />
+                    <input type="tel" placeholder="Phone Number (+1234567890)" value={formData.phone_number} onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" disabled={isSubmitting} />
+                    <input type="text" placeholder="API ID" value={formData.api_id} onChange={(e) => setFormData({ ...formData, api_id: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" disabled={isSubmitting} />
+                    <input type="text" placeholder="API Hash" value={formData.api_hash} onChange={(e) => setFormData({ ...formData, api_hash: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" disabled={isSubmitting} />
+                    <button type="submit" disabled={isSubmitting} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isSubmitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Send Code"}
+                    </button>
+                </form>
+              </div>
             )}
 
             {loginStep === 'otp' && (
               <form onSubmit={(e) => { e.preventDefault(); handleVerifyCode(); }} className="space-y-4">
-                <p className="text-gray-400 text-sm">
-                  Enter the OTP code sent to your phone
-                </p>
-                <input
-                  type="text"
-                  placeholder="OTP Code"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    "Verify Code"
-                  )}
+                <p className="text-gray-400 text-sm">Enter the OTP code sent to your phone</p>
+                <input type="text" placeholder="OTP Code" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" disabled={isSubmitting} />
+                <button type="submit" disabled={isSubmitting} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  {isSubmitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Verify Code"}
                 </button>
               </form>
             )}
@@ -309,38 +258,14 @@ export default function TelegramAccounts() {
             {loginStep === '2fa' && (
               <form onSubmit={(e) => { e.preventDefault(); handleVerify2FA(); }} className="space-y-4">
                 <p className="text-gray-400 text-sm">Enter your 2FA password</p>
-                <input
-                  type="password"
-                  placeholder="2FA Password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    "Verify 2FA"
-                  )}
+                <input type="password" placeholder="2FA Password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" disabled={isSubmitting} />
+                <button type="submit" disabled={isSubmitting} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  {isSubmitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Verify 2FA"}
                 </button>
               </form>
             )}
 
-            <button
-              onClick={() => {
-                setShowAddModal(false);
-                setLoginStep('init');
-              }}
-              disabled={isSubmitting}
-              className="w-full mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
+            <button onClick={handleCloseModal} disabled={isSubmitting} className="w-full mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50">Cancel</button>
           </motion.div>
         </div>
       )}

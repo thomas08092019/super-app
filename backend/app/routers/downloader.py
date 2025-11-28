@@ -26,6 +26,7 @@ async def start_download(
     Start a media download task
     """
     # Start Celery task
+    # IMPORTANT: Must pass save_locally here
     task = download_media_task.apply_async(
         args=[
             request.session_id,
@@ -33,7 +34,8 @@ async def start_download(
             request.media_types,
             request.start_time,
             request.end_time,
-            request.limit # Pass limit to task
+            request.limit,
+            request.save_locally # <--- FIX: Truyền tham số này cho worker
         ]
     )
     

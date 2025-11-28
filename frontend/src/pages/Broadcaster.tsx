@@ -1,12 +1,10 @@
-/**
- * Broadcaster page - Send messages to multiple chats
- */
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Radio, Send, Plus, X } from 'lucide-react';
 import { broadcasterAPI, telegramAPI } from '../services/api';
 import type { TelegramSession } from '../types';
 import ChatSelector from '../components/ChatSelector';
+import CustomSelect from '../components/CustomSelect';
 
 export default function Broadcaster() {
   const [sessions, setSessions] = useState<TelegramSession[]>([]);
@@ -99,6 +97,8 @@ export default function Broadcaster() {
     }
   };
 
+  const sessionOptions = sessions.map(s => ({ value: s.id, label: s.session_name }));
+
   return (
     <div className="p-8">
       <motion.div
@@ -114,7 +114,6 @@ export default function Broadcaster() {
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Configuration panel */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -128,18 +127,13 @@ export default function Broadcaster() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Telegram Session
                 </label>
-                <select
-                  value={sessionId || ''}
-                  onChange={(e) => setSessionId(Number(e.target.value))}
-                  disabled={broadcasting}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  {sessions.map((session) => (
-                    <option key={session.id} value={session.id}>
-                      {session.session_name}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                    value={sessionId || ''}
+                    onChange={(val) => setSessionId(val)}
+                    options={sessionOptions}
+                    placeholder="Select Account"
+                    disabled={broadcasting}
+                />
               </div>
 
               <div>
@@ -152,7 +146,7 @@ export default function Broadcaster() {
                   placeholder="Enter your message..."
                   disabled={broadcasting}
                   rows={6}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50"
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50 text-white"
                 />
               </div>
             </div>
@@ -246,7 +240,6 @@ export default function Broadcaster() {
           </button>
         </motion.div>
 
-        {/* Status panel */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
