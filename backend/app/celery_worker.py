@@ -114,12 +114,13 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
     session_string, api_id, api_hash = await get_session_string_safe(session_id)
     if not session_string: return {'status': 'failed', 'error': 'Session not found'}
     
+    try:
+        if limit: limit = int(limit)
+    except: limit = None
+
     start_dt = parse_ts(start_time)
     end_dt = parse_ts(end_time)
-    if limit:
-        try: limit = int(limit)
-        except: limit = None
-
+    
     workdir = f"./sessions/worker_{session_id}"
     os.makedirs(workdir, exist_ok=True)
     client = Client(name=f"worker_downloader_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True)
@@ -141,7 +142,7 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
         os.makedirs(temp_dir, exist_ok=True)
         export_dir = "/app/exports"
         if save_locally: os.makedirs(export_dir, exist_ok=True)
-
+        
         total_downloaded = 0
 
         for idx, target_chat in enumerate(target_chats):
@@ -154,7 +155,7 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
                 target_messages = []
                 async for message in client.get_chat_history(target_chat):
                     if end_dt and message.date > end_dt: continue
-                    if start_dt and message.date < start_dt: break
+                    if start_dt and message.date < start_dt: break 
                     is_match = False
                     if 'photo' in media_types and message.photo: is_match = True
                     elif 'video' in media_types and (message.video or message.video_note): is_match = True
@@ -200,7 +201,6 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
                             os.remove(local_path)
                             self.update_state(state='PROGRESS', meta={'status': f'Downloaded {fname}...', 'progress': int(idx/len(target_chats)*100)})
                     except Exception: continue
-
             except Exception as e: 
                 print(f"Error processing chat {target_chat}: {e}")
                 continue
@@ -215,8 +215,7 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
 async def process_dump(self, session_id: int, chat_ids: list, start_time=None, end_time=None, task_db_id=None):
     session_string, api_id, api_hash = await get_session_string_safe(session_id)
     if not session_string:
-        if task_db_id: 
-            await update_dump_task_status(task_db_id, 'failed', error='Session not found')
+        if task_db_id: await update_dump_task_status(task_db_id, 'failed', error='Session not found')
         return {'status': 'failed', 'error': 'Session not found'}
     
     start_dt = parse_ts(start_time)
@@ -227,8 +226,7 @@ async def process_dump(self, session_id: int, chat_ids: list, start_time=None, e
     client = Client(name=f"worker_dumper_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True)
     
     count = 0
-    if task_db_id: 
-        await update_dump_task_status(task_db_id, 'running')
+    if task_db_id: await update_dump_task_status(task_db_id, 'running')
     
     try:
         await client.start()
@@ -246,7 +244,6 @@ async def process_dump(self, session_id: int, chat_ids: list, start_time=None, e
                  except Exception as e: 
                      print(f"Resolve fail {cid}: {e}")
 
-        total_chats = len(target_chats)
         export_dir = "/app/exports/dumps"
         os.makedirs(export_dir, exist_ok=True)
 
@@ -257,7 +254,7 @@ async def process_dump(self, session_id: int, chat_ids: list, start_time=None, e
             folder_name = chat_username if chat_username else safe_title
             json_file_path = os.path.join(export_dir, f"{session_id}_{folder_name}_dump.jsonl")
             
-            self.update_state(state='PROGRESS', meta={'status': f'Dumping {chat_title} ({idx+1}/{total_chats})...', 'progress': int(idx/total_chats*100)})
+            self.update_state(state='PROGRESS', meta={'status': f'Dumping {chat_title} ({idx+1}/{len(target_chats)})...', 'progress': int(idx/len(target_chats)*100)})
             
             with open(json_file_path, 'a', encoding='utf-8') as f:
                 async for msg in client.get_chat_history(chat.id):
@@ -272,15 +269,12 @@ async def process_dump(self, session_id: int, chat_ids: list, start_time=None, e
                     
                     count += 1
                     if count % 100 == 0:
-                        if task_db_id: 
-                            await update_dump_task_status(task_db_id, 'running', progress=int(idx/total_chats*100), total=count)
+                        if task_db_id: await update_dump_task_status(task_db_id, 'running', progress=int(idx/len(target_chats)*100), total=count)
         
-        if task_db_id: 
-            await update_dump_task_status(task_db_id, 'completed', progress=100, total=count)
-        return {'status': 'completed', 'total_messages': count, 'message': f'Dumped {count} messages from {total_chats} chats.'}
+        if task_db_id: await update_dump_task_status(task_db_id, 'completed', progress=100, total=count)
+        return {'status': 'completed', 'total_messages': count, 'message': f'Dumped {count} messages from {len(target_chats)} chats.'}
     except Exception as e:
-        if task_db_id: 
-            await update_dump_task_status(task_db_id, 'failed', error=str(e))
+        if task_db_id: await update_dump_task_status(task_db_id, 'failed', error=str(e))
         return {'status': 'failed', 'error': str(e)}
     finally:
         if client.is_connected:

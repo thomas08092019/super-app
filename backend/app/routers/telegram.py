@@ -21,7 +21,6 @@ async def ws_broadcast(session_id: int, message_log: MessageLog):
         "type": "message", "session_id": session_id,
         "message": {
             "id": message_log.id, "telegram_message_id": message_log.telegram_message_id,
-            "session_id": session_id, # Ensure session_id is included in message object
             "chat_id": message_log.chat_id, "chat_name": message_log.chat_name, "chat_username": message_log.chat_username,
             "sender_id": message_log.sender_id, "sender_name": message_log.sender_name, "sender_username": message_log.sender_username,
             "content": message_log.content, "media_type": message_log.media_type, "timestamp": ts_str
@@ -63,8 +62,11 @@ async def get_messages(session_id: Optional[int] = None, chat_id: Optional[str] 
     else: query = query.where(MessageLog.session_id.in_(select(TelegramSession.id).where(TelegramSession.user_id == current_user.id)))
     if chat_id: query = query.where(MessageLog.chat_id == chat_id)
     if search: query = query.where(MessageLog.content.ilike(f"%{search}%"))
-    if start_date: query = query.where(MessageLog.timestamp >= start_date)
-    if end_date: query = query.where(MessageLog.timestamp <= end_date)
+    
+    # Force Naive UTC for DB comparison
+    if start_date: query = query.where(MessageLog.timestamp >= start_date.replace(tzinfo=None))
+    if end_date: query = query.where(MessageLog.timestamp <= end_date.replace(tzinfo=None))
+    
     query = query.order_by(desc(MessageLog.timestamp)).offset((page - 1) * limit).limit(limit)
     results = (await db.execute(query)).scalars().all()
     formatted_results = []
