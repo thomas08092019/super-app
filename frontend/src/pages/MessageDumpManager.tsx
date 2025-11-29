@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Search, Archive, Filter, ChevronLeft, ChevronRight, Copy, X, User, ExternalLink } from 'lucide-react';
+import { Search, Archive, Filter, ChevronLeft, ChevronRight, Copy, X, User, ExternalLink, Calendar, Trash2 } from 'lucide-react';
 import { dumperAPI, telegramAPI } from '../services/api';
 import CustomSelect from '../components/CustomSelect';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +13,11 @@ export default function MessageDumpManager() {
   const [sessionId, setSessionId] = useState<number>(0);
   const [chatId, setChatId] = useState('');
   const [search, setSearch] = useState('');
+  
+  // REMOVED DEFAULT DATES
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -20,37 +25,45 @@ export default function MessageDumpManager() {
   const [prevScrollHeight, setPrevScrollHeight] = useState(0);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
 
-  // Init
   useEffect(() => {
     telegramAPI.getSessions().then(setSessions);
     dumperAPI.getGroups().then(setGroups);
   }, []);
 
-  // Fetch Data (Changed to Infinite Scroll Up style)
+  const loadMessages = async (reset = false) => {
+    setLoading(true);
+    try {
+        const toUTC = (d: string) => d ? new Date(d).toISOString() : undefined;
+        const data = await dumperAPI.getMessages({ 
+            session_id: sessionId || undefined, 
+            chat_id: chatId, 
+            search, 
+            page, 
+            limit: 20,
+            start_date: toUTC(startDate),
+            end_date: toUTC(endDate)
+        });
+
+        if (data.length === 0) setHasMore(false);
+        
+        const sorted = [...data].reverse();
+        
+        if (reset || page === 1) {
+            setMessages(sorted);
+            setTimeout(() => {
+                if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }, 50);
+        } else {
+             if (scrollRef.current) setPrevScrollHeight(scrollRef.current.scrollHeight);
+             setMessages(prev => [...sorted, ...prev]);
+        }
+    } catch(e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
   useEffect(() => {
-    const fetch = async () => {
-        setLoading(true);
-        try {
-            const data = await dumperAPI.getMessages({ session_id: sessionId || undefined, chat_id: chatId, search, page, limit: 20 });
-            if (data.length === 0) setHasMore(false);
-            
-            const sorted = [...data].reverse();
-            
-            if (page === 1) {
-                setMessages(sorted);
-                // Scroll to bottom on first load
-                setTimeout(() => {
-                    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                }, 50);
-            } else {
-                 if (scrollRef.current) setPrevScrollHeight(scrollRef.current.scrollHeight);
-                 setMessages(prev => [...sorted, ...prev]);
-            }
-        } catch(e) { console.error(e); }
-        finally { setLoading(false); }
-    };
-    fetch();
-  }, [sessionId, chatId, search, page]);
+    loadMessages(page === 1);
+  }, [sessionId, chatId, search, page, startDate, endDate]);
 
   useLayoutEffect(() => {
     if (scrollRef.current && prevScrollHeight > 0) {
@@ -60,7 +73,6 @@ export default function MessageDumpManager() {
     }
   }, [messages, prevScrollHeight]);
 
-  // Infinite Scroll Up
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (e.currentTarget.scrollTop === 0 && hasMore && !loading) {
         setPage(p => p + 1);
@@ -79,11 +91,24 @@ export default function MessageDumpManager() {
       setSessionId(0);
       setChatId('');
       setSearch('');
+      setStartDate('');
+      setEndDate('');
       setPage(1);
       setHasMore(true);
   };
 
-  // Helpers
+  const handleClearAllData = async () => {
+      if(!confirm("⚠️ WARNING: This will delete ALL dumped messages and tasks history. This action cannot be undone.\n\nAre you sure you want to proceed?")) return;
+      try {
+          await dumperAPI.clearAll();
+          setMessages([]);
+          alert("All data cleared successfully.");
+          loadMessages(true);
+      } catch (e) {
+          alert("Failed to clear data.");
+      }
+  };
+
   const getAvatarColor = (name: string) => {
     const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500'];
     return colors[(name?.length || 0) % colors.length];
@@ -102,23 +127,28 @@ export default function MessageDumpManager() {
   return (
     <div className="p-8 h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
         <div className="mb-6 flex-shrink-0">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-4">
                 <h1 className="text-3xl font-bold flex items-center gap-3"><Archive className="text-purple-500"/> Dumped Messages</h1>
-                {(sessionId !== 0 || chatId !== '') && (
-                    <button onClick={handleClearFilter} className="text-sm bg-red-600/20 text-red-400 px-3 py-1.5 rounded hover:bg-red-600/30 transition-colors flex items-center gap-2">
-                        <X size={14}/> Clear Filters
+                <div className="flex gap-3">
+                    {(sessionId !== 0 || chatId !== '' || startDate || endDate) && (
+                        <button onClick={handleClearFilter} className="text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded transition-colors flex items-center gap-2">
+                            <X size={14}/> Clear Filters
+                        </button>
+                    )}
+                    <button onClick={handleClearAllData} className="text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded transition-colors flex items-center gap-2 shadow-lg shadow-red-900/20">
+                        <Trash2 size={16}/> Delete All Data
                     </button>
-                )}
+                </div>
             </div>
             
-            <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700 flex gap-4 items-center shadow-lg flex-wrap">
-                <div className="min-w-[200px]">
-                    <CustomSelect value={sessionId} onChange={val => {setSessionId(val); setPage(1);}} options={[{value:0, label:'All Accounts'}, ...sessions.map(s=>({value:s.id, label:s.session_name}))]} placeholder="Account" />
-                </div>
-                <div className="min-w-[250px]">
-                    <CustomSelect value={chatId} onChange={val => {setChatId(val); setPage(1);}} options={[{value:'', label:'All Groups'}, ...groups.map(g=>({value:g.id, label:g.name}))]} placeholder="Group" />
-                </div>
+            <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 shadow-lg">
+                <div className="flex-1"><CustomSelect value={sessionId} onChange={val => {setSessionId(val); setPage(1);}} options={[{value:0, label:'All Accounts'}, ...sessions.map(s=>({value:s.id, label:s.session_name}))]} placeholder="Account" className="w-full"/></div>
+                <div className="flex-1"><CustomSelect value={chatId} onChange={val => {setChatId(val); setPage(1);}} options={[{value:'', label:'All Groups'}, ...groups.map(g=>({value:g.id, label:g.name}))]} placeholder="Group" className="w-full"/></div>
                 <div className="flex-1 relative"><Search className="absolute left-3 top-2.5 text-gray-400" size={18}/><input type="text" value={search} onChange={e=>{setSearch(e.target.value); setPage(1);}} placeholder="Search content..." className="w-full bg-gray-900 border border-gray-600 rounded-lg pl-10 pr-4 py-2 outline-none focus:ring-2 focus:ring-purple-500 text-white"/></div>
+                <div className="flex gap-2 w-full max-w-md">
+                    <div className="flex-1 min-w-0"><input type="datetime-local" value={startDate} onChange={e=>{setStartDate(e.target.value); setPage(1);}} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 text-xs text-white outline-none focus:ring-2 focus:ring-purple-500 truncate"/></div>
+                    <div className="flex-1 min-w-0"><input type="datetime-local" value={endDate} onChange={e=>{setEndDate(e.target.value); setPage(1);}} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2 text-xs text-white outline-none focus:ring-2 focus:ring-purple-500 truncate"/></div>
+                </div>
             </div>
         </div>
 
@@ -182,28 +212,17 @@ export default function MessageDumpManager() {
 
         <AnimatePresence>
             {selectedUser && (
-                <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedUser(null)}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedUser(null)}>
                     <motion.div initial={{scale:0.9}} animate={{scale:1}} exit={{scale:0.9}} className="bg-gray-800 rounded-xl p-6 max-w-md w-full border border-gray-700 shadow-2xl" onClick={e => e.stopPropagation()}>
                         <div className="relative h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-lg mb-8"><button onClick={() => setSelectedUser(null)} className="absolute top-2 right-2 p-1 bg-black/20 rounded-full hover:bg-black/40 text-white"><X size={20}/></button><div className={`absolute -bottom-8 left-6 w-20 h-20 rounded-full border-4 border-gray-800 flex items-center justify-center text-2xl font-bold text-white ${getAvatarColor(selectedUser.sender_name)}`}>{getInitials(selectedUser.sender_name)}</div></div>
                         <h2 className="text-xl font-bold text-white px-2">{selectedUser.sender_name}</h2>
                         <div className="flex items-center gap-2 text-gray-400 px-2 mb-4 text-sm"><span>ID: {selectedUser.sender_id}</span><button onClick={() => navigator.clipboard.writeText(selectedUser.sender_id)} className="hover:text-white"><Copy size={14}/></button></div>
-                        
-                        <div className="space-y-4">
-                            <div className="p-3 bg-gray-700/30 rounded-lg">
-                                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Group Context</p>
-                                <div className="flex justify-between items-center">
-                                    <span className="font-medium text-blue-300 truncate max-w-[150px]">{selectedUser.chat_name}</span>
-                                    <button onClick={() => handleFilterByGroup(selectedUser.chat_id, selectedUser.session_id)} className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors">Filter</button>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">Group ID: {selectedUser.chat_id}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button onClick={() => navigate('/telegram/osint', { state: { query: selectedUser.sender_id, type: 'profile' } })} className="flex items-center justify-center gap-2 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors font-medium text-sm"><User size={16} /> View Profile</button>
-                                <button onClick={() => window.open(`tg://user?id=${selectedUser.sender_id}`, '_blank')} className="flex items-center justify-center gap-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors font-medium text-sm text-gray-300"><ExternalLink size={16} /> Open in TG</button>
-                            </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button onClick={() => navigate('/telegram/osint', { state: { query: selectedUser.sender_id, type: 'profile' } })} className="bg-blue-600 hover:bg-blue-700 py-2 rounded text-white text-sm">View Profile</button>
+                            <button onClick={() => window.open(`tg://user?id=${selectedUser.sender_id}`, '_blank')} className="bg-gray-700 hover:bg-gray-600 py-2 rounded text-white text-sm">Open in TG</button>
                         </div>
                     </motion.div>
-                </motion.div>
+                </div>
             )}
         </AnimatePresence>
     </div>

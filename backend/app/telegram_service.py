@@ -163,3 +163,52 @@ class TelegramManager:
             chat = await client.get_chat(group_link)
             return {"chat_id": chat.id, "title": chat.title, "username": chat.username, "member_count": chat.members_count, "description": chat.description, "is_verified": chat.is_verified}
         except Exception as e: return {"error": str(e)}
+
+    @staticmethod
+    async def get_history_for_summary(session_id: int, chat_ids: list, start_time: datetime, end_time: datetime, limit: int = 500) -> list:
+        """
+        Fetch messages directly from Telegram for AI summary
+        """
+        client = active_clients.get(session_id)
+        # If not active, try to create temporary one (or use ensure_client_active from router)
+        if not client or not client.is_connected:
+             return [] # Router should handle connection ensuring
+        
+        messages_text = []
+        
+        # If chat_ids is empty or None, we can't easily dump ALL chats for summary in real-time quickly.
+        # So we require at least one chat ID or use a small subset of dialogs.
+        # For now, assume chat_ids provided.
+        
+        target_chats = []
+        if not chat_ids or not chat_ids[0]:
+             # Limit to top 5 dialogs if no chat selected to prevent overload
+             async for d in client.get_dialogs(limit=5): target_chats.append(d.chat)
+        else:
+             for cid in chat_ids:
+                 try:
+                     val = int(cid) if str(cid).lstrip('-').isdigit() else cid
+                     chat = await client.get_chat(val)
+                     target_chats.append(chat)
+                 except: continue
+
+        for chat in target_chats:
+            chat_title = chat.title or f"{chat.first_name or ''} {chat.last_name or ''}".strip()
+            async for msg in client.get_chat_history(chat.id):
+                # Time filter
+                if end_time and msg.date > end_time: continue
+                if start_time and msg.date < start_time: break # Optimisation: stop if older
+                
+                # Content filter
+                content = msg.text or msg.caption or ""
+                if not content: continue # Skip media-only for summary unless needed
+                
+                sender = f"{msg.from_user.first_name} {msg.from_user.last_name or ''}" if msg.from_user else msg.sender_chat.title if msg.sender_chat else "Unknown"
+                
+                messages_text.append(f"[{msg.date}] {chat_title} | {sender}: {content}")
+                
+                if len(messages_text) >= limit: break
+            
+            if len(messages_text) >= limit: break
+            
+        return messages_text

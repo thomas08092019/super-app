@@ -86,11 +86,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    command: >
-      sh -c "
-        python seed.py &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-      "
+    # CMD is now handled by Dockerfile's ./run.sh
 
   celery_worker:
     build:

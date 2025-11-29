@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11
 
 WORKDIR /app
 
@@ -16,12 +16,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p /app/media /app/sessions
+RUN mkdir -p /app/media /app/sessions /app/exports
 
 # Set permissions
-RUN chmod -R 777 /app/sessions /app/media
+RUN chmod -R 777 /app/sessions /app/media /app/exports
+# Make run script executable
+RUN chmod +x /app/run.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
+CMD ["./run.sh"]

@@ -105,12 +105,22 @@ class DumpedMessage(Base):
     telegram_message_id = Column(Integer, nullable=False)
     sender_id = Column(String(100), nullable=True)
     sender_name = Column(String(255), nullable=True)
-    sender_username = Column(String(255), nullable=True) # Added for UI consistency
+    sender_username = Column(String(255), nullable=True)
     content = Column(Text, nullable=True)
     media_type = Column(String(50), nullable=True)
     message_date = Column(DateTime, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
-    __table_args__ = (
-        UniqueConstraint('session_id', 'chat_id', 'telegram_message_id', name='_unique_msg_uc'),
-    )
+    __table_args__ = (UniqueConstraint('session_id', 'chat_id', 'telegram_message_id', name='_unique_msg_uc'),)
+
+# New Table for AI Summary History
+class AISummaryLog(Base):
+    __tablename__ = "ai_summaries"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    session_id = Column(Integer, ForeignKey("telegram_sessions.id", ondelete="CASCADE"), nullable=False)
+    chat_names = Column(String(500), nullable=True) # Comma separated names
+    summary_content = Column(Text, nullable=False)
+    message_count = Column(Integer, default=0)
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

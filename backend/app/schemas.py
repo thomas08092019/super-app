@@ -1,15 +1,9 @@
-"""
-Pydantic schemas for request/response validation
-"""
 from __future__ import annotations
-
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 from app.models import UserRole, UserStatus
 
-
-# User Schemas
 class UserResponse(BaseModel):
     id: int
     username: Optional[str]
@@ -17,54 +11,41 @@ class UserResponse(BaseModel):
     role: UserRole
     status: UserStatus
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
-
-# Authentication Schemas
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-
 
 class RegisterRequest(BaseModel):
     username: Optional[str] = None
     email: EmailStr
     password: str = Field(..., min_length=6)
 
-
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
 
-
 class UserUpdateStatus(BaseModel):
     status: UserStatus
-
 
 class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=6)
 
-
-# Telegram Session Schemas
 class TelegramLoginRequest(BaseModel):
     session_name: str
     phone_number: str
     api_id: str
     api_hash: str
 
-
 class TelegramOTPRequest(BaseModel):
     session_name: str
     code: str
 
-
 class Telegram2FARequest(BaseModel):
     session_name: str
     password: str
-
 
 class TelegramSessionResponse(BaseModel):
     id: int
@@ -72,16 +53,11 @@ class TelegramSessionResponse(BaseModel):
     phone_number: str
     is_active: bool
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
-
-# Message Schemas
 class MessageResponse(BaseModel):
     id: int
     telegram_message_id: int
-    session_id: int
     chat_id: str
     chat_name: Optional[str]
     chat_username: Optional[str]
@@ -92,35 +68,28 @@ class MessageResponse(BaseModel):
     media_type: Optional[str]
     media_path: Optional[str]
     timestamp: datetime
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
-
-# AI Summary Schemas
 class SummaryRequest(BaseModel):
     session_id: int
-    chat_id: Optional[str] = None
+    chat_ids: List[str] = []
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-
 
 class SummaryResponse(BaseModel):
     summary: str
     message_count: int
     time_range: dict
 
-
-# Download Task Schemas
 class DownloadRequest(BaseModel):
     session_id: int
+    chat_id: str
     chat_ids: List[str] = []
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     media_types: List[str] = ["photo", "video", "document"]
     limit: Optional[int] = None
     save_locally: bool = False
-
 
 class DownloadTaskResponse(BaseModel):
     id: int
@@ -131,12 +100,8 @@ class DownloadTaskResponse(BaseModel):
     downloaded_files: int
     progress: int
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
-
-# OSINT Schemas
 class ProfileLookupResponse(BaseModel):
     user_id: Optional[int]
     username: Optional[str]
@@ -147,7 +112,6 @@ class ProfileLookupResponse(BaseModel):
     dc_id: Optional[int]
     common_chats_count: int
 
-
 class GroupLookupResponse(BaseModel):
     chat_id: int
     title: str
@@ -156,8 +120,6 @@ class GroupLookupResponse(BaseModel):
     description: Optional[str]
     is_verified: bool
 
-
-# Broadcaster Schemas
 class BroadcastRequest(BaseModel):
     session_id: int
     message: str
@@ -165,20 +127,17 @@ class BroadcastRequest(BaseModel):
     delay_min: int = Field(default=2, ge=1, le=10)
     delay_max: int = Field(default=5, ge=2, le=20)
 
-
 class BroadcastResponse(BaseModel):
     task_id: str
     total_targets: int
     status: str
 
-
-# Dump Schemas
 class DumpRequest(BaseModel):
     session_id: int
+    chat_id: Optional[str] = None
     chat_ids: List[str] = []
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-
 
 class DumpTaskResponse(BaseModel):
     id: int
@@ -188,6 +147,4 @@ class DumpTaskResponse(BaseModel):
     total_messages: int
     progress: int
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True

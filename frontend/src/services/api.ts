@@ -42,8 +42,6 @@ export const telegramAPI = {
   getGroupsHistory: async (sid: number) => (await api.get('/telegram/groups', { params: { session_id: sid } })).data
 };
 
-export const aiAPI = { summarize: async (data: any) => (await api.post('/ai/summarize', data)).data };
-
 export const downloaderAPI = {
   startDownload: async (data: any) => (await api.post('/downloader/start', data)).data,
   getTasks: async () => (await api.get('/downloader/tasks')).data,
@@ -65,10 +63,23 @@ export const storageAPI = {
 
 export const dumperAPI = {
   startDump: async (data: any) => (await api.post('/dumper/start', data)).data,
+  triggerAutoDump: async () => (await api.post('/dumper/auto-dump')).data,
   getStatus: async (id: string) => (await api.get(`/dumper/status/${id}`)).data,
   stopDump: async (id: string) => (await api.delete(`/dumper/stop/${id}`)).data,
+  clearAll: async () => (await api.delete('/dumper/clear')).data,
   getMessages: async (params: any) => (await api.get('/dumper/messages', { params })).data,
   getGroups: async () => (await api.get('/dumper/groups')).data
+};
+
+export const aiAPI = {
+  summarize: async (data: any) => {
+    const response = await api.post('/ai/summarize', data);
+    return response.data;
+  },
+  getHistory: async (page: number = 1) => {
+    const response = await api.get(`/ai/history?page=${page}`);
+    return response.data;
+  }
 };
 
 export default api;

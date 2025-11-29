@@ -24,6 +24,8 @@ export default function LiveFeed() {
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [selectedGroup, setSelectedGroup] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // REMOVED DEFAULT DATES
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -42,86 +44,61 @@ export default function LiveFeed() {
     sessionIdRef.current = sessionId;
   }, [selectedGroup, sessionId]);
 
-  useEffect(() => {
-    loadSessions();
-  }, []);
+  useEffect(() => { loadSessions(); }, []);
 
-  // Effect 1: Session Change -> Load Groups & Connect WS
-  useEffect(() => {
-    loadGroups();
-    connectAllWebSockets();
-    return () => { if (ws.current) ws.current.close(); };
-  }, [sessionId]);
-
-  // Effect 2: Filters Change -> Fetch Data
   useEffect(() => {
     setMessages([]);
     setPage(1);
     setHasMore(true);
+    loadGroups();
     fetchMessages(1, true);
-  }, [sessionId, selectedGroup]);
+    connectAllWebSockets();
+    return () => { if (ws.current) ws.current.close(); };
+  }, [sessionId]);
 
   useLayoutEffect(() => {
-    if (scrollRef.current && prevScrollHeight > 0) {
-      const newScrollHeight = scrollRef.current.scrollHeight;
-      scrollRef.current.scrollTop += (newScrollHeight - prevScrollHeight);
-      setPrevScrollHeight(0);
-    } else if (scrollRef.current && page === 1 && !loading) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current) {
+      if (prevScrollHeight > 0) {
+        const newScrollHeight = scrollRef.current.scrollHeight;
+        scrollRef.current.scrollTop = newScrollHeight - prevScrollHeight;
+        setPrevScrollHeight(0);
+      } else if (page === 1 && !loading) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
     }
   }, [messages, prevScrollHeight, loading, page]);
 
-  const loadSessions = async () => {
-    try {
-      const data = await telegramAPI.getSessions();
-      setSessions(data);
-    } catch (error) { console.error(error); }
-  };
-
-  const loadGroups = async () => {
-    try {
-      const idToLoad = sessionId === 0 ? undefined : sessionId;
-      const data = await telegramAPI.getGroupsHistory(idToLoad as number);
-      setGroups(data);
-    } catch (error) { console.error(error); }
-  };
+  const loadSessions = async () => { try { const data = await telegramAPI.getSessions(); setSessions(data); } catch (e) { console.error(e); } };
+  const loadGroups = async () => { try { const data = await telegramAPI.getGroupsHistory(sessionId === 0 ? undefined : sessionId); setGroups(data); } catch (e) { console.error(e); } };
 
   const fetchMessages = async (pageNum: number, reset: boolean = false, overrideParams: { chat_id?: string } = {}) => {
     setLoading(true);
     try {
       const chatFilter = overrideParams.chat_id !== undefined ? overrideParams.chat_id : selectedGroup;
       const targetSession = sessionId === 0 ? undefined : sessionId;
-
       const toUTC = (dateStr: string) => dateStr ? new Date(dateStr).toISOString() : undefined;
 
       const data = await telegramAPI.getMessages({
-        session_id: targetSession as number,
-        page: pageNum,
-        limit: 20,
-        chat_id: chatFilter || undefined,
-        search: searchQuery || undefined,
-        start_date: toUTC(dateRange.start),
-        end_date: toUTC(dateRange.end)
+        session_id: targetSession, page: pageNum, limit: 20,
+        chat_id: chatFilter || undefined, search: searchQuery || undefined,
+        start_date: toUTC(dateRange.start), end_date: toUTC(dateRange.end)
       });
 
       if (data.length < 20) setHasMore(false);
       const sorted = [...data].reverse();
       
-      if (reset) {
-        setMessages(sorted);
-      } else {
+      if (reset) setMessages(sorted);
+      else {
         if (scrollRef.current) setPrevScrollHeight(scrollRef.current.scrollHeight);
         setMessages(prev => [...sorted, ...prev]);
       }
-    } catch (error) { console.error(error); } 
-    finally { setLoading(false); }
+    } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
   const connectAllWebSockets = () => {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     if (ws.current) ws.current.close();
     const WS_URL = API_URL.replace('http', 'ws') + `/telegram/ws/feed/${sessionId}`;
-    
     ws.current = new WebSocket(WS_URL);
     ws.current.onopen = () => setConnected(true);
     ws.current.onclose = () => setConnected(false);
@@ -129,17 +106,11 @@ export default function LiveFeed() {
       const data = JSON.parse(event.data);
       if (data.type === 'message') {
         const msg = data.message;
-        const msgSessionId = data.session_id;
-        const isSessionMatch = sessionIdRef.current === 0 || sessionIdRef.current === msgSessionId;
+        const isSessionMatch = sessionIdRef.current === 0 || sessionIdRef.current === data.session_id;
         const isGroupMatch = !selectedGroupRef.current || msg.chat_id === selectedGroupRef.current;
-
         if (isSessionMatch && isGroupMatch) {
           setMessages(prev => [...prev, msg]);
-          setTimeout(() => {
-             if (scrollRef.current) {
-                 scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-             }
-          }, 50);
+          setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 50);
         }
       }
     };
@@ -153,51 +124,34 @@ export default function LiveFeed() {
 
   const handleSearch = () => { setPage(1); setHasMore(true); fetchMessages(1, true); };
   const loadMore = () => { const nextPage = page + 1; setPage(nextPage); fetchMessages(nextPage, false); };
-  
-  const handleFilterByGroup = (chatId: string, newSessionId?: number) => { 
-      if (newSessionId) setSessionId(newSessionId);
-      setSelectedGroup(chatId);
-      // UseEffect will trigger fetch
-  };
-  
+  const handleFilterByGroup = (chatId: string, newSessionId?: number) => { if (newSessionId) setSessionId(newSessionId); setSelectedGroup(chatId); };
   const clearGroupFilter = () => { setSelectedGroup(''); };
-
+  
   const handleViewProfile = (user: Message) => {
-    const query = user.sender_username ? user.sender_username : user.sender_id;
+    const query = user.sender_username || user.sender_id;
     if (query) navigate('/telegram/osint', { state: { query, type: 'profile' } });
   };
-
   const handleViewGroup = (user: Message) => {
-    const query = user.chat_username ? user.chat_username : user.chat_id;
+    const query = user.chat_username || user.chat_id;
     if (query) navigate('/telegram/osint', { state: { query, type: 'group' } });
   };
-
   const handleOpenInTG = (user: Message) => {
     if (user.sender_username) window.open(`https://t.me/${user.sender_username}`, '_blank');
     else if (user.sender_id) window.open(`tg://user?id=${user.sender_id}`, '_blank');
   };
-
   const handleOpenGroupInTG = (user: Message) => {
     if (user.chat_username) window.open(`https://t.me/${user.chat_username}`, '_blank');
-    else alert('Cannot open private group directly without a username link.');
+    else alert('No username link available');
   };
 
   const getAvatarColor = (name: string) => {
-    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500'];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return colors[Math.abs(hash) % colors.length];
+    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500'];
+    return colors[(name?.length || 0) % colors.length];
   };
-
   const getInitials = (name: string) => name ? name.substring(0, 2).toUpperCase() : '??';
-
   const formatTime = (isoString: string) => {
-    if (!isoString) return '';
-    try {
-      return new Date(isoString).toLocaleString('vi-VN', { 
-        hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' 
-      });
-    } catch (e) { return isoString; }
+    try { return new Date(isoString).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }); } 
+    catch { return isoString; }
   };
 
   const sessionOptions = [{ value: 0, label: 'All Accounts' }, ...sessions.map(s => ({ value: s.id, label: s.session_name }))];
@@ -231,7 +185,7 @@ export default function LiveFeed() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2 mb-1 min-w-0">
                   <span className="font-bold text-blue-300 truncate cursor-pointer hover:underline max-w-[200px]" onClick={() => setSelectedUser(msg)}>{msg.sender_name || 'Unknown'}</span>
-                  <button onClick={() => handleFilterByGroup(msg.chat_id, msg.session_id)} className="text-xs text-gray-400 hover:text-white hover:underline flex items-center gap-1 transition-colors bg-gray-800 px-2 py-0.5 rounded truncate max-w-[200px]" title="Click to filter by this group">in {msg.chat_name} <Filter size={10} className="opacity-50 flex-shrink-0" /></button>
+                  <button onClick={() => handleFilterByGroup(msg.chat_id, sessionId)} className="text-xs text-gray-400 hover:text-white hover:underline flex items-center gap-1 transition-colors bg-gray-800 px-2 py-0.5 rounded truncate max-w-[200px]" title="Click to filter by this group">in {msg.chat_name} <Filter size={10} className="opacity-50 flex-shrink-0" /></button>
                   <span className="text-xs text-gray-500 ml-auto flex-shrink-0">{formatTime(msg.timestamp)}</span>
                 </div>
                 <div className="bg-gray-800 rounded-lg rounded-tl-none p-3 inline-block max-w-full border border-gray-700/50">

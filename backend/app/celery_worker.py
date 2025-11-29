@@ -35,7 +35,8 @@ async def get_session_string_safe(session_id: int):
         print(f"DB Error in Worker: {e}")
         return None, None, None
     finally:
-        if conn: await conn.close()
+        if conn:
+            await conn.close()
 
 async def save_file_metadata(session_id, chat_id, chat_name, message_id, file_name, file_path, file_type, file_size):
     conn = None
@@ -69,9 +70,11 @@ async def save_dumped_message(session_id, chat_id, chat_name, msg):
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             ON CONFLICT (session_id, chat_id, telegram_message_id) DO NOTHING
         ''', session_id, str(chat_id), chat_name, msg.id, sender_id, sender_name.strip(), sender_username, content, media_type, msg.date, datetime.utcnow())
-    except Exception as e: print(f"Error saving dump msg: {e}")
-    finally: 
-        if conn: await conn.close()
+    except Exception as e:
+        print(f"Error saving dump msg: {e}")
+    finally:
+        if conn:
+            await conn.close()
 
 async def update_dump_task_status(task_db_id, status, progress=0, error=None, total=0):
     if not task_db_id: return
@@ -97,17 +100,13 @@ def sanitize_filename(name):
 
 def parse_ts(ts):
     if not ts: return None
-    dt = ts
-    if not isinstance(ts, datetime):
-        try:
-            dt = datetime.fromisoformat(str(ts).replace('Z', '+00:00'))
-        except:
-            return None
-    
-    # CRITICAL FIX: Convert to naive UTC for comparison with Pyrogram's dates and DB storage
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
-    return dt
+    if isinstance(ts, datetime):
+        if ts.tzinfo is not None: return ts.astimezone(timezone.utc).replace(tzinfo=None)
+        return ts
+    try:
+        dt = datetime.fromisoformat(str(ts).replace('Z', '+00:00'))
+        return dt.replace(tzinfo=None)
+    except: return None
 
 async def process_download(self, session_id: int, chat_ids: list, media_types: list, start_time=None, end_time=None, limit=None, save_locally=False):
     session_string, api_id, api_hash = await get_session_string_safe(session_id)
@@ -121,8 +120,9 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
 
     workdir = f"./sessions/worker_{session_id}"
     os.makedirs(workdir, exist_ok=True)
-    client = Client(name=f"worker_downloader_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True)
-    downloaded_files = []
+    client = Client(name=f"worker_downloader_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True, ipv6=False)
+    
+    total_downloaded = 0
     
     try:
         await client.start()
@@ -142,8 +142,6 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
         export_dir = "/app/exports"
         if save_locally: os.makedirs(export_dir, exist_ok=True)
         
-        total_downloaded = 0
-
         for idx, target_chat in enumerate(target_chats):
             try:
                 self.update_state(state='PROGRESS', meta={'status': f'Resolving chat {target_chat}...', 'progress': 0})
@@ -156,9 +154,14 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
                 scanned_count = 0
                 async for message in client.get_chat_history(target_chat):
                     scanned_count += 1
-                    if scanned_count % 50 == 0: self.update_state(state='PROGRESS', meta={'status': f'Scanned {scanned_count} messages in {chat_title}... Found {len(target_messages)} files.', 'progress': 0})
+                    # Throttle scanning slightly
+                    if scanned_count % 200 == 0: await asyncio.sleep(0.5)
+                    
+                    if scanned_count % 50 == 0: self.update_state(state='PROGRESS', meta={'status': f'Scanned {scanned_count} msgs in {chat_title}. Found {len(target_messages)} files.', 'progress': 0})
+                    
                     if end_dt and message.date > end_dt: continue
                     if start_dt and message.date < start_dt: break 
+                    
                     is_match = False
                     if 'photo' in media_types and message.photo: is_match = True
                     elif 'video' in media_types and (message.video or message.video_note): is_match = True
@@ -190,7 +193,7 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
                             if is_archive(fname): ftype="archive"
                             else: ftype="document"
                         
-                        self.update_state(state='PROGRESS', meta={'current': i+1, 'total': len(target_messages), 'progress': int((i+1)/len(target_messages)*100), 'status': f'Downloading: {fname} ({i+1}/{len(target_messages)})'})
+                        self.update_state(state='PROGRESS', meta={'current': i+1, 'total': len(target_messages), 'progress': int(i/len(target_messages)*100), 'status': f'Downloading: {fname} ({i+1}/{len(target_messages)})'})
                         
                         local_path = await client.download_media(message, file_name=os.path.join(temp_dir, fname))
                         if local_path:
@@ -207,7 +210,10 @@ async def process_download(self, session_id: int, chat_ids: list, media_types: l
                                     self.update_state(state='PROGRESS', meta={'status': f'Saved locally: {fname}', 'progress': int((i+1)/len(target_messages)*100)})
                                 except: pass
                             os.remove(local_path)
-                            self.update_state(state='PROGRESS', meta={'status': f'Finished processing: {fname}', 'progress': int((i+1)/len(target_messages)*100)})
+                            self.update_state(state='PROGRESS', meta={'status': f'Finished: {fname}', 'progress': int((i+1)/len(target_messages)*100)})
+                            
+                            # Anti-flood delay between downloads
+                            await asyncio.sleep(0.5)
                     except Exception as e:
                         self.update_state(state='PROGRESS', meta={'status': f'Error processing {fname}: {str(e)}', 'progress': int((i+1)/len(target_messages)*100)})
                         continue
@@ -232,9 +238,10 @@ async def process_dump(self, session_id: int, chat_ids: list, start_time=None, e
 
     workdir = f"./sessions/worker_dump_{session_id}"
     os.makedirs(workdir, exist_ok=True)
-    client = Client(name=f"worker_dumper_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True)
+    client = Client(name=f"worker_dumper_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True, ipv6=False)
     
-    total_messages_count = 0 # Sử dụng biến này để theo dõi tổng số tin nhắn đã dump
+    count = 0
+    total_messages_count = 0
     if task_db_id: await update_dump_task_status(task_db_id, 'running')
     
     try:
@@ -272,23 +279,36 @@ async def process_dump(self, session_id: int, chat_ids: list, start_time=None, e
             self.update_state(state='PROGRESS', meta={'status': f'Dumping {chat_title} ({idx+1}/{total_chats})...', 'progress': int(idx/total_chats*100)})
             
             chat_msg_count = 0
-            with open(json_file_path, 'a', encoding='utf-8') as f:
-                async for msg in client.get_chat_history(chat.id):
-                    # Ensure msg.date is compared with naive UTC datetimes
-                    if end_dt and msg.date > end_dt: continue
-                    if start_dt and msg.date < start_dt: continue
-                    
-                    await save_dumped_message(session_id, str(chat.id), chat_title, msg)
-                    
-                    content = msg.text or msg.caption or ""
-                    dump_obj = {"id": msg.id, "date": msg.date.isoformat(), "sender": msg.from_user.id if msg.from_user else None, "content": content}
-                    f.write(json.dumps(dump_obj) + "\n")
-                    
-                    total_messages_count += 1
-                    chat_msg_count += 1
-                    if total_messages_count % 50 == 0:
-                        if task_db_id: await update_dump_task_status(task_db_id, 'running', progress=int(idx/total_chats*100), total=total_messages_count)
-                        self.update_state(state='PROGRESS', meta={'status': f'Dumped {total_messages_count} total msgs ({chat_msg_count} in {chat_title}).', 'progress': int(idx/total_chats*100)})
+            try:
+                with open(json_file_path, 'a', encoding='utf-8') as f:
+                    async for msg in client.get_chat_history(chat.id):
+                        # Throttle to avoid FloodWait: Sleep 1s every 100 msgs
+                        if chat_msg_count > 0 and chat_msg_count % 100 == 0:
+                             await asyncio.sleep(1)
+                        
+                        if end_dt and msg.date > end_dt: continue
+                        if start_dt and msg.date < start_dt: break
+                        
+                        # Skip empty content for dumps
+                        content = msg.text or msg.caption or ""
+                        if not content.strip() and not msg.media: 
+                            continue
+
+                        await save_dumped_message(session_id, str(chat.id), chat_title, msg)
+                        
+                        dump_obj = {"id": msg.id, "date": msg.date.isoformat(), "sender": msg.from_user.id if msg.from_user else None, "content": content}
+                        f.write(json.dumps(dump_obj) + "\n")
+                        
+                        count += 1
+                        total_messages_count += 1
+                        chat_msg_count += 1
+                        
+                        if total_messages_count % 50 == 0:
+                            if task_db_id: await update_dump_task_status(task_db_id, 'running', progress=int(idx/total_chats*100), total=total_messages_count)
+                            self.update_state(state='PROGRESS', meta={'status': f'Dumped {total_messages_count} total msgs ({chat_msg_count} in {chat_title}).', 'progress': int(idx/total_chats*100)})
+            except Exception as e:
+                print(f"Error dumping chat {chat_title}: {e}")
+                continue
         
         if task_db_id: await update_dump_task_status(task_db_id, 'completed', progress=100, total=total_messages_count)
         return {'status': 'completed', 'total_messages': total_messages_count, 'message': f'Dumped {total_messages_count} messages from {total_chats} chats.'}
@@ -304,7 +324,7 @@ async def process_broadcast(self, session_id: int, message: str, target_chat_ids
     if not session_string: return {'status': 'failed', 'error': 'Session not found'}
     workdir = f"./sessions/worker_broadcast_{session_id}"
     os.makedirs(workdir, exist_ok=True)
-    client = Client(name=f"worker_broadcaster_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True)
+    client = Client(name=f"worker_broadcaster_{session_id}", api_id=int(api_id), api_hash=api_hash, session_string=session_string, workdir=workdir, no_updates=True, ipv6=False)
     try:
         await client.start()
         total = len(target_chat_ids); sent = 0; failed = 0
