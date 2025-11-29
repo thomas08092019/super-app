@@ -45,7 +45,6 @@ async def summarize_messages(
     if not message_lines:
         return SummaryResponse(summary="No messages found in this period.", message_count=0, time_range={})
 
-    # RAG / Vector Filtering logic
     selected_lines = message_lines
     
     if len(message_lines) > 100:
@@ -90,8 +89,7 @@ async def summarize_messages(
     context = "\n".join(selected_lines)
 
     try:
-        # Reverted to gemini-pro to fix 404 error
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         prompt = f"""Summarize these Telegram messages. 
         Focus on: Key discussions, Decisions, and Action items.
@@ -103,7 +101,6 @@ async def summarize_messages(
         response = model.generate_content(prompt)
         summary_text = response.text
         
-        # Save History
         log = AISummaryLog(
             user_id=current_user.id,
             session_id=request.session_id,
