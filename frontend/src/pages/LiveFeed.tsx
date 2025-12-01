@@ -7,6 +7,7 @@ import {
 import { telegramAPI } from '../services/api';
 import type { Message, TelegramSession } from '../types';
 import CustomSelect from '../components/CustomSelect';
+import { formatTime } from '@/utils/time';
 
 interface GroupOption {
     id: string;
@@ -201,10 +202,6 @@ export default function LiveFeed() {
         return colors[(name?.length || 0) % colors.length];
     };
     const getInitials = (name: string) => name ? name.substring(0, 2).toUpperCase() : '??';
-    const formatTime = (isoString: string) => {
-        try { return new Date(isoString).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }); } 
-        catch { return isoString; }
-    };
 
     const sessionOptions = [{ value: 0, label: 'All Accounts' }, ...sessions.map(s => ({ value: s.id, label: s.session_name }))];
     const groupOptions = [{ value: '', label: 'All Groups' }, ...groups.map(g => ({ value: g.id, label: g.name }))];

@@ -1,7 +1,3 @@
-/**
- * TypeScript type definitions for the application
- */
-
 export interface User {
   id: number;
   username?: string;
@@ -11,16 +7,8 @@ export interface User {
   created_at: string;
 }
 
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  token_type: string;
-  user: User;
-}
+export interface LoginRequest { email: string; password: string; }
+export interface TokenResponse { access_token: string; token_type: string; user: User; }
 
 export interface TelegramSession {
   id: number;
@@ -29,53 +17,6 @@ export interface TelegramSession {
   is_active: boolean;
   created_at: string;
 }
-
-export interface Message {
-  id: number;
-  telegram_message_id: number;
-  session_id: number; // Added session_id
-  chat_id: string;
-  chat_name?: string;
-  chat_username?: string;
-  sender_id?: string;
-  sender_name?: string;
-  sender_username?: string;
-  content?: string;
-  media_type?: string;
-  media_path?: string;
-  timestamp: string;
-}
-
-export interface DownloadTask {
-  id: number;
-  task_id: string;
-  status: string;
-  chat_name?: string;
-  total_files: number;
-  downloaded_files: number;
-  progress: number;
-  created_at: string;
-}
-
-export interface BroadcastRequest {
-  session_id: number;
-  message: string;
-  target_chat_ids: string[];
-  delay_min?: number;
-  delay_max?: number;
-}
-
-export interface DumpTask {
-    id: number;
-    task_id: string;
-    status: string;
-    chat_name: string;
-    total_messages: number;
-    progress: number;
-    created_at: string;
-}
-
-// --- ACADEMY TYPES ---
 
 export interface JapaneseCharacter {
   id: number;
@@ -86,19 +27,23 @@ export interface JapaneseCharacter {
 }
 
 export interface QuizQuestion {
-  char_id: number;
-  question_char: string;
+  id?: number;
+  question_text: string;
+  question_subtext?: string;
   options: string[];
   correct_answer: string;
+  type: string;
 }
 
 export interface QuizSubmissionDetail {
   question_content: string;
   user_answer: string;
+  correct_answer: string;
   is_correct: boolean;
 }
 
 export interface QuizSubmission {
+  quiz_type: string;
   details: QuizSubmissionDetail[];
 }
 
@@ -107,8 +52,16 @@ export interface AcademyStats {
   total_questions_answered: number;
   average_accuracy: number;
   recent_history: {
+    id: number;
     date: string;
     score: string;
     mode: string;
   }[];
+}
+
+export interface MistakeDetail {
+    question: string;
+    user_answer: string;
+    correct_answer: string;
+    is_correct: boolean;
 }

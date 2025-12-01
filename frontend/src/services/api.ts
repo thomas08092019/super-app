@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AcademyStats, JapaneseCharacter, QuizQuestion, QuizSubmission, LoginRequest, TokenResponse, User, TelegramSession, Message } from '../types';
+import type { AcademyStats, JapaneseCharacter, QuizQuestion, QuizSubmission, LoginRequest, TokenResponse, User, TelegramSession, Message, MistakeDetail } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const api = axios.create({ baseURL: API_URL, headers: { 'Content-Type': 'application/json' } });
@@ -89,11 +89,17 @@ export const academyAPI = {
   getCharacters: async (type: string = 'hiragana'): Promise<JapaneseCharacter[]> => 
     (await api.get('/academy/japanese/characters', { params: { char_type: type } })).data,
     
-  getQuiz: async (type: string = 'hiragana', limit: number = 10): Promise<QuizQuestion[]> => 
-    (await api.get('/academy/japanese/quiz', { params: { char_type: type, limit } })).data,
+  // Updated Quiz APIs
+  getCharacterQuiz: async (alphabets: string[], mode: string, limit: number): Promise<QuizQuestion[]> => 
+    (await api.get('/academy/japanese/quiz/character', { params: { alphabets, mode, limit } })).data,
+
+  getSentenceQuiz: async (limit: number, mode: string): Promise<QuizQuestion[]> => 
+    (await api.get('/academy/japanese/quiz/sentence', { params: { limit, mode } })).data,
     
   submitQuiz: async (data: QuizSubmission) => (await api.post('/academy/japanese/submit', data)).data,
   
+  getSessionHistory: async (id: number): Promise<MistakeDetail[]> => (await api.get(`/academy/history/${id}`)).data,
+
   setupData: async () => (await api.post('/academy/setup-data')).data
 };
 

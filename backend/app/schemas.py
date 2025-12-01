@@ -1,12 +1,10 @@
 from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from app.models import UserRole, UserStatus
 
-# ... (Giữ nguyên các schema cũ: UserResponse, LoginRequest, etc.) ...
-# Copy lại các schema cũ để đảm bảo file hoàn chỉnh
-
+# ... (Các schema cũ giữ nguyên) ...
 class UserResponse(BaseModel):
     id: int
     username: Optional[str]
@@ -163,17 +161,21 @@ class JapaneseCharacterResponse(BaseModel):
     class Config: from_attributes = True
 
 class QuizQuestion(BaseModel):
-    char_id: int
-    question_char: str
+    id: Optional[int] = None # ID of character or just index
+    question_text: str # Can be Character or Romaji
+    question_subtext: Optional[str] = None # Vietnamese hint for Romaji
     options: List[str]
     correct_answer: str
+    type: str = "character" # 'character' or 'sentence'
 
 class QuizSubmissionDetail(BaseModel):
     question_content: str
     user_answer: str
+    correct_answer: str # Add correct answer to submission to save history
     is_correct: bool
 
 class QuizSubmission(BaseModel):
+    quiz_type: str # 'character' or 'sentence'
     details: List[QuizSubmissionDetail]
 
 class AcademyStatsResponse(BaseModel):
@@ -181,3 +183,9 @@ class AcademyStatsResponse(BaseModel):
     total_questions_answered: int
     average_accuracy: float
     recent_history: List[Dict[str, Any]]
+
+class MistakeDetail(BaseModel):
+    question: str
+    user_answer: str
+    correct_answer: str
+    is_correct: bool

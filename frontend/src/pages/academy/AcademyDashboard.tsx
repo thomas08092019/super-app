@@ -1,18 +1,28 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Trophy, Brain, CheckCircle, Clock, Zap } from 'lucide-react';
+import { BookOpen, Trophy, Brain, CheckCircle, Clock, Zap, X, AlertCircle } from 'lucide-react';
 import { academyAPI } from '../../services/api';
-import type { AcademyStats } from '../../types';
+import type { AcademyStats, MistakeDetail } from '../../types';
+import { formatTime } from '@/utils/time';
 
 export default function AcademyDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AcademyStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [sessionMistakes, setSessionMistakes] = useState<MistakeDetail[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     loadStats();
   }, []);
+
+  useEffect(() => {
+    if (selectedSessionId) {
+        loadSessionDetails(selectedSessionId);
+    }
+  }, [selectedSessionId]);
 
   const loadStats = async () => {
     try {
@@ -23,6 +33,18 @@ export default function AcademyDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadSessionDetails = async (id: number) => {
+      setLoadingHistory(true);
+      try {
+          const mistakes = await academyAPI.getSessionHistory(id);
+          setSessionMistakes(mistakes.filter(m => !m.is_correct));
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setLoadingHistory(false);
+      }
   };
 
   const StatCard = ({ icon: Icon, label, value, color }: any) => (
@@ -75,20 +97,68 @@ export default function AcademyDashboard() {
             <div className="text-center py-10 text-gray-500">No activity yet. Start learning!</div>
           ) : (
             stats?.recent_history.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center p-4 bg-gray-900/50 rounded-lg hover:bg-gray-700/50 transition-colors border border-gray-700/30">
+              <div 
+                key={idx} 
+                onClick={() => setSelectedSessionId(item.id)}
+                className="flex justify-between items-center p-4 bg-gray-900/50 rounded-lg hover:bg-gray-700/50 transition-colors border border-gray-700/30 cursor-pointer group"
+              >
                 <div className="flex items-center gap-4">
-                  <div className={`w-2 h-2 rounded-full ${item.mode === 'quiz' ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
-                  <span className="text-gray-200 capitalize font-medium">{item.mode} Session</span>
+                  <div className={`w-2 h-2 rounded-full ${item.mode.includes('quiz') ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
+                  <div>
+                      <span className="text-gray-200 font-medium block">{item.mode}</span>
+                      <span className="text-xs text-gray-500">{formatTime(item.date)}</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <span className="text-sm text-gray-500">{new Date(item.date).toLocaleDateString()} {new Date(item.date).toLocaleTimeString()}</span>
-                  <span className="font-mono font-bold bg-gray-800 px-3 py-1 rounded text-indigo-400 border border-gray-700">{item.score}</span>
+                  <span className="font-mono font-bold bg-gray-800 px-3 py-1 rounded text-indigo-400 border border-gray-700 group-hover:border-indigo-500/50 transition-colors">{item.score}</span>
                 </div>
               </div>
             ))
           )}
         </div>
       </motion.div>
+
+      {/* HISTORY DETAIL MODAL */}
+      <AnimatePresence>
+        {selectedSessionId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedSessionId(null)}>
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-gray-800 rounded-xl w-full max-w-2xl border border-gray-700 shadow-2xl overflow-hidden max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                    <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900">
+                        <h3 className="font-bold text-lg text-white flex items-center gap-2"><AlertCircle className="text-red-500" size={20}/> Mistakes Review</h3>
+                        <button onClick={() => setSelectedSessionId(null)} className="hover:text-white text-gray-400"><X size={20}/></button>
+                    </div>
+                    <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                        {loadingHistory ? (
+                            <div className="text-center py-10"><div className="inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>
+                        ) : sessionMistakes.length === 0 ? (
+                            <div className="text-center py-10 text-gray-400 flex flex-col items-center">
+                                <CheckCircle size={48} className="text-green-500 mb-4 opacity-50"/>
+                                <p>Perfect Score! No mistakes found in this session.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {sessionMistakes.map((m, i) => (
+                                    <div key={i} className="bg-gray-900/50 p-4 rounded-lg border border-red-500/20">
+                                        <p className="text-white font-medium mb-2 text-lg">{m.question}</p>
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div className="text-red-400">
+                                                <span className="block text-xs text-gray-500 uppercase">Your Answer</span>
+                                                {m.user_answer}
+                                            </div>
+                                            <div className="text-green-400">
+                                                <span className="block text-xs text-gray-500 uppercase">Correct Answer</span>
+                                                {m.correct_answer}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </motion.div>
+            </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

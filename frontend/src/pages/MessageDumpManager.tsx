@@ -4,6 +4,7 @@ import { dumperAPI, telegramAPI } from '../services/api';
 import CustomSelect from '../components/CustomSelect';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { formatTime } from '@/utils/time';
 
 export default function MessageDumpManager() {
   const navigate = useNavigate();
@@ -115,14 +116,6 @@ export default function MessageDumpManager() {
   };
   
   const getInitials = (name: string) => name ? name.substring(0, 2).toUpperCase() : '??';
-  
-  const formatTime = (isoString: string) => {
-      try {
-        return new Date(isoString).toLocaleString('vi-VN', { 
-            hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' 
-        });
-      } catch { return isoString; }
-  };
 
   return (
     <div className="p-8 h-screen flex flex-col bg-gray-900 text-white overflow-hidden">

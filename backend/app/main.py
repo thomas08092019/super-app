@@ -2,11 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
-from app.database import init_db, AsyncSessionLocal
+from app.database import init_db, AsyncSessionLocal, engine
 from app.routers import auth, admin, telegram, ai_summary, downloader, broadcaster, storage, dumper, academy
 from app.models import TelegramSession, DumpTask
 from app.celery_worker import dump_messages_task
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, text
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.routers.academy import seed_japanese_characters
@@ -26,16 +26,15 @@ async def auto_dump_job():
             
             if not existing_task:
                 print(f"[SCHEDULER] Auto-dump starting for session {s.session_name}...")
-                dump_messages_task.apply_async(args=[s.id, [], today_start.isoformat(), today_end.isoformat()], kwargs={'is_auto': True})
+                dump_messages_task.apply_async(args=[s.id, [], today_start.isoformat(), today_end.isoformat(), None], kwargs={'is_auto': True})
             else:
                 print(f"[SCHEDULER] Dump exists for {s.session_name}. Skipping.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 Starting Super App Backend...")
-    await init_db()
     
-    # --- AUTO SEED ACADEMY DATA ---
+    await init_db()
     async with AsyncSessionLocal() as db:
         try:
             await seed_japanese_characters(db)
@@ -44,6 +43,7 @@ async def lifespan(app: FastAPI):
             
     scheduler.add_job(auto_dump_job, 'cron', hour=0, minute=1)
     scheduler.start()
+    
     yield
     print("👋 Shutting down...")
 

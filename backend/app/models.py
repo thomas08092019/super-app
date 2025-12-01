@@ -133,7 +133,7 @@ class JapaneseCharacter(Base):
     character = Column(String(10), nullable=False, index=True)
     romaji = Column(String(10), nullable=False)
     type = Column(String(20), nullable=False) # 'hiragana' or 'katakana'
-    group_name = Column(String(20), nullable=True) # e.g., 'a-row', 'ka-row'
+    group_name = Column(String(20), nullable=True)
 
 class StudySession(Base):
     __tablename__ = "study_sessions"
@@ -141,6 +141,7 @@ class StudySession(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subject = Column(String(50), default="japanese")
     mode = Column(String(50)) # 'quiz', 'flashcard'
+    quiz_type = Column(String(50), nullable=True) # 'character', 'sentence'
     score = Column(Integer, default=0)
     total_questions = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -152,9 +153,9 @@ class StudyDetail(Base):
     __tablename__ = "study_details"
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("study_sessions.id", ondelete="CASCADE"), nullable=False)
-    question_content = Column(String(255))
-    user_answer = Column(String(255))
-    correct_answer = Column(String(255))
+    question_content = Column(Text) # Cho phép dài hơn cho câu
+    user_answer = Column(Text)
+    correct_answer = Column(Text)
     is_correct = Column(Boolean, default=False)
     
     session = relationship("StudySession", back_populates="details")
