@@ -14,6 +14,11 @@ import OSINT from './pages/OSINT';
 import Broadcaster from './pages/Broadcaster';
 import MessageDumpManager from './pages/MessageDumpManager';
 
+// --- ACADEMY IMPORTS ---
+import AcademyDashboard from './pages/academy/AcademyDashboard';
+import Flashcards from './pages/academy/Flashcards';
+import Quiz from './pages/academy/Quiz';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -27,7 +32,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-screen bg-gray-900 text-white"><Sidebar /><main className="flex-1 lg:ml-64">{children}</main></div>;
+  return <div className="flex h-screen bg-gray-900 text-white overflow-hidden"><Sidebar /><main className="flex-1 lg:ml-64 h-full overflow-hidden">{children}</main></div>;
 }
 
 function App() {
@@ -42,6 +47,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        
+        {/* System & Telegram Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<AdminRoute><Layout><UserManagement /></Layout></AdminRoute>} />
         <Route path="/telegram/accounts" element={<ProtectedRoute><Layout><TelegramAccounts /></Layout></ProtectedRoute>} />
@@ -52,6 +59,12 @@ function App() {
         <Route path="/telegram/dumps" element={<ProtectedRoute><Layout><MessageDumpManager /></Layout></ProtectedRoute>} />
         <Route path="/telegram/osint" element={<ProtectedRoute><Layout><OSINT /></Layout></ProtectedRoute>} />
         <Route path="/telegram/broadcast" element={<ProtectedRoute><Layout><Broadcaster /></Layout></ProtectedRoute>} />
+        
+        {/* --- ACADEMY ROUTES --- */}
+        <Route path="/academy" element={<ProtectedRoute><Layout><AcademyDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/academy/learn" element={<ProtectedRoute><Layout><Flashcards /></Layout></ProtectedRoute>} />
+        <Route path="/academy/quiz" element={<ProtectedRoute><Layout><Quiz /></Layout></ProtectedRoute>} />
+
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>

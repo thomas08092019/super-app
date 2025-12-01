@@ -74,3 +74,41 @@ export interface DumpTask {
     progress: number;
     created_at: string;
 }
+
+// --- ACADEMY TYPES ---
+
+export interface JapaneseCharacter {
+  id: number;
+  character: string;
+  romaji: string;
+  type: 'hiragana' | 'katakana';
+  group_name: string;
+}
+
+export interface QuizQuestion {
+  char_id: number;
+  question_char: string;
+  options: string[];
+  correct_answer: string;
+}
+
+export interface QuizSubmissionDetail {
+  question_content: string;
+  user_answer: string;
+  is_correct: boolean;
+}
+
+export interface QuizSubmission {
+  details: QuizSubmissionDetail[];
+}
+
+export interface AcademyStats {
+  total_sessions: number;
+  total_questions_answered: number;
+  average_accuracy: number;
+  recent_history: {
+    date: string;
+    score: string;
+    mode: string;
+  }[];
+}

@@ -3,12 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import init_db, AsyncSessionLocal
-from app.routers import auth, admin, telegram, ai_summary, downloader, broadcaster, storage, dumper
+from app.routers import auth, admin, telegram, ai_summary, downloader, broadcaster, storage, dumper, academy
 from app.models import TelegramSession, DumpTask
 from app.celery_worker import dump_messages_task
 from sqlalchemy import select, and_
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.routers.academy import seed_japanese_characters
 
 scheduler = AsyncIOScheduler()
 
@@ -25,7 +26,6 @@ async def auto_dump_job():
             
             if not existing_task:
                 print(f"[SCHEDULER] Auto-dump starting for session {s.session_name}...")
-                # Pass empty list for ALL chats
                 dump_messages_task.apply_async(args=[s.id, [], today_start.isoformat(), today_end.isoformat()], kwargs={'is_auto': True})
             else:
                 print(f"[SCHEDULER] Dump exists for {s.session_name}. Skipping.")
@@ -34,6 +34,14 @@ async def auto_dump_job():
 async def lifespan(app: FastAPI):
     print("🚀 Starting Super App Backend...")
     await init_db()
+    
+    # --- AUTO SEED ACADEMY DATA ---
+    async with AsyncSessionLocal() as db:
+        try:
+            await seed_japanese_characters(db)
+        except Exception as e:
+            print(f"❌ Error seeding academy data: {e}")
+            
     scheduler.add_job(auto_dump_job, 'cron', hour=0, minute=1)
     scheduler.start()
     yield
@@ -50,6 +58,7 @@ app.include_router(downloader.router)
 app.include_router(broadcaster.router)
 app.include_router(storage.router)
 app.include_router(dumper.router)
+app.include_router(academy.router)
 
 @app.get("/")
 async def root(): return {"status": "running"}

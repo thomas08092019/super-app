@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { LoginRequest, TokenResponse, User, TelegramSession, Message } from '../types';
+import type { AcademyStats, JapaneseCharacter, QuizQuestion, QuizSubmission, LoginRequest, TokenResponse, User, TelegramSession, Message } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const api = axios.create({ baseURL: API_URL, headers: { 'Content-Type': 'application/json' } });
@@ -80,6 +80,21 @@ export const aiAPI = {
     const response = await api.get(`/ai/history?page=${page}`);
     return response.data;
   }
+};
+
+// --- ACADEMY API ---
+export const academyAPI = {
+  getStats: async (): Promise<AcademyStats> => (await api.get('/academy/dashboard/stats')).data,
+  
+  getCharacters: async (type: string = 'hiragana'): Promise<JapaneseCharacter[]> => 
+    (await api.get('/academy/japanese/characters', { params: { char_type: type } })).data,
+    
+  getQuiz: async (type: string = 'hiragana', limit: number = 10): Promise<QuizQuestion[]> => 
+    (await api.get('/academy/japanese/quiz', { params: { char_type: type, limit } })).data,
+    
+  submitQuiz: async (data: QuizSubmission) => (await api.post('/academy/japanese/submit', data)).data,
+  
+  setupData: async () => (await api.post('/academy/setup-data')).data
 };
 
 export default api;

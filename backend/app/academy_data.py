@@ -1,0 +1,26 @@
+# Dữ liệu bảng chữ cái Hiragana và Katakana cơ bản
+HIRAGANA_DATA = [
+    {"character": "あ", "romaji": "a", "group_name": "a"}, {"character": "い", "romaji": "i", "group_name": "a"}, {"character": "う", "romaji": "u", "group_name": "a"}, {"character": "え", "romaji": "e", "group_name": "a"}, {"character": "お", "romaji": "o", "group_name": "a"},
+    {"character": "か", "romaji": "ka", "group_name": "ka"}, {"character": "き", "romaji": "ki", "group_name": "ka"}, {"character": "く", "romaji": "ku", "group_name": "ka"}, {"character": "け", "romaji": "ke", "group_name": "ka"}, {"character": "こ", "romaji": "ko", "group_name": "ka"},
+    {"character": "さ", "romaji": "sa", "group_name": "sa"}, {"character": "し", "romaji": "shi", "group_name": "sa"}, {"character": "す", "romaji": "su", "group_name": "sa"}, {"character": "せ", "romaji": "se", "group_name": "sa"}, {"character": "そ", "romaji": "so", "group_name": "sa"},
+    {"character": "た", "romaji": "ta", "group_name": "ta"}, {"character": "ち", "romaji": "chi", "group_name": "ta"}, {"character": "つ", "romaji": "tsu", "group_name": "ta"}, {"character": "て", "romaji": "te", "group_name": "ta"}, {"character": "と", "romaji": "to", "group_name": "ta"},
+    {"character": "な", "romaji": "na", "group_name": "na"}, {"character": "に", "romaji": "ni", "group_name": "na"}, {"character": "ぬ", "romaji": "nu", "group_name": "na"}, {"character": "ね", "romaji": "ne", "group_name": "na"}, {"character": "の", "romaji": "no", "group_name": "na"},
+    {"character": "は", "romaji": "ha", "group_name": "ha"}, {"character": "ひ", "romaji": "hi", "group_name": "ha"}, {"character": "ふ", "romaji": "fu", "group_name": "ha"}, {"character": "へ", "romaji": "he", "group_name": "ha"}, {"character": "ほ", "romaji": "ho", "group_name": "ha"},
+    {"character": "ま", "romaji": "ma", "group_name": "ma"}, {"character": "み", "romaji": "mi", "group_name": "ma"}, {"character": "む", "romaji": "mu", "group_name": "ma"}, {"character": "め", "romaji": "me", "group_name": "ma"}, {"character": "も", "romaji": "mo", "group_name": "ma"},
+    {"character": "や", "romaji": "ya", "group_name": "ya"}, {"character": "ゆ", "romaji": "yu", "group_name": "ya"}, {"character": "よ", "romaji": "yo", "group_name": "ya"},
+    {"character": "ら", "romaji": "ra", "group_name": "ra"}, {"character": "り", "romaji": "ri", "group_name": "ra"}, {"character": "る", "romaji": "ru", "group_name": "ra"}, {"character": "れ", "romaji": "re", "group_name": "ra"}, {"character": "ろ", "romaji": "ro", "group_name": "ra"},
+    {"character": "わ", "romaji": "wa", "group_name": "wa"}, {"character": "を", "romaji": "wo", "group_name": "wa"}, {"character": "ん", "romaji": "n", "group_name": "n"},
+]
+
+KATAKANA_DATA = [
+    {"character": "ア", "romaji": "a", "group_name": "a"}, {"character": "イ", "romaji": "i", "group_name": "a"}, {"character": "ウ", "romaji": "u", "group_name": "a"}, {"character": "エ", "romaji": "e", "group_name": "a"}, {"character": "オ", "romaji": "o", "group_name": "a"},
+    {"character": "カ", "romaji": "ka", "group_name": "ka"}, {"character": "キ", "romaji": "ki", "group_name": "ka"}, {"character": "ク", "romaji": "ku", "group_name": "ka"}, {"character": "ケ", "romaji": "ke", "group_name": "ka"}, {"character": "コ", "romaji": "ko", "group_name": "ka"},
+    {"character": "サ", "romaji": "sa", "group_name": "sa"}, {"character": "シ", "romaji": "shi", "group_name": "sa"}, {"character": "ス", "romaji": "su", "group_name": "sa"}, {"character": "セ", "romaji": "se", "group_name": "sa"}, {"character": "ソ", "romaji": "so", "group_name": "sa"},
+    {"character": "タ", "romaji": "ta", "group_name": "ta"}, {"character": "チ", "romaji": "chi", "group_name": "ta"}, {"character": "ツ", "romaji": "tsu", "group_name": "ta"}, {"character": "テ", "romaji": "te", "group_name": "ta"}, {"character": "ト", "romaji": "to", "group_name": "ta"},
+    {"character": "ナ", "romaji": "na", "group_name": "na"}, {"character": "ニ", "romaji": "ni", "group_name": "na"}, {"character": "ヌ", "romaji": "nu", "group_name": "na"}, {"character": "ネ", "romaji": "ne", "group_name": "na"}, {"character": "ノ", "romaji": "no", "group_name": "na"},
+    {"character": "ハ", "romaji": "ha", "group_name": "ha"}, {"character": "ヒ", "romaji": "hi", "group_name": "ha"}, {"character": "フ", "romaji": "fu", "group_name": "ha"}, {"character": "ヘ", "romaji": "he", "group_name": "ha"}, {"character": "ホ", "romaji": "ho", "group_name": "ha"},
+    {"character": "マ", "romaji": "ma", "group_name": "ma"}, {"character": "ミ", "romaji": "mi", "group_name": "ma"}, {"character": "ム", "romaji": "mu", "group_name": "ma"}, {"character": "メ", "romaji": "me", "group_name": "ma"}, {"character": "モ", "romaji": "mo", "group_name": "ma"},
+    {"character": "ヤ", "romaji": "ya", "group_name": "ya"}, {"character": "ユ", "romaji": "yu", "group_name": "ya"}, {"character": "ヨ", "romaji": "yo", "group_name": "ya"},
+    {"character": "ラ", "romaji": "ra", "group_name": "ra"}, {"character": "リ", "romaji": "ri", "group_name": "ra"}, {"character": "ル", "romaji": "ru", "group_name": "ra"}, {"character": "レ", "romaji": "re", "group_name": "ra"}, {"character": "ロ", "romaji": "ro", "group_name": "ra"},
+    {"character": "ワ", "romaji": "wa", "group_name": "wa"}, {"character": "ヲ", "romaji": "wo", "group_name": "wa"}, {"character": "ン", "romaji": "n", "group_name": "n"},
+]

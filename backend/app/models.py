@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Enum, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Enum, UniqueConstraint, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -22,6 +22,7 @@ class User(Base):
     status = Column(Enum(UserStatus), default=UserStatus.ACTIVE, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     telegram_sessions = relationship("TelegramSession", back_populates="user", cascade="all, delete-orphan")
+    study_sessions = relationship("StudySession", back_populates="user", cascade="all, delete-orphan")
 
 class TelegramSession(Base):
     __tablename__ = "telegram_sessions"
@@ -112,15 +113,48 @@ class DumpedMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     __table_args__ = (UniqueConstraint('session_id', 'chat_id', 'telegram_message_id', name='_unique_msg_uc'),)
 
-# New Table for AI Summary History
 class AISummaryLog(Base):
     __tablename__ = "ai_summaries"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     session_id = Column(Integer, ForeignKey("telegram_sessions.id", ondelete="CASCADE"), nullable=False)
-    chat_names = Column(String(500), nullable=True) # Comma separated names
+    chat_names = Column(String(500), nullable=True)
     summary_content = Column(Text, nullable=False)
     message_count = Column(Integer, default=0)
     start_time = Column(DateTime, nullable=True)
     end_time = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+# --- ACADEMY MODELS ---
+
+class JapaneseCharacter(Base):
+    __tablename__ = "japanese_characters"
+    id = Column(Integer, primary_key=True, index=True)
+    character = Column(String(10), nullable=False, index=True)
+    romaji = Column(String(10), nullable=False)
+    type = Column(String(20), nullable=False) # 'hiragana' or 'katakana'
+    group_name = Column(String(20), nullable=True) # e.g., 'a-row', 'ka-row'
+
+class StudySession(Base):
+    __tablename__ = "study_sessions"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    subject = Column(String(50), default="japanese")
+    mode = Column(String(50)) # 'quiz', 'flashcard'
+    score = Column(Integer, default=0)
+    total_questions = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User", back_populates="study_sessions")
+    details = relationship("StudyDetail", back_populates="session", cascade="all, delete-orphan")
+
+class StudyDetail(Base):
+    __tablename__ = "study_details"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("study_sessions.id", ondelete="CASCADE"), nullable=False)
+    question_content = Column(String(255))
+    user_answer = Column(String(255))
+    correct_answer = Column(String(255))
+    is_correct = Column(Boolean, default=False)
+    
+    session = relationship("StudySession", back_populates="details")
