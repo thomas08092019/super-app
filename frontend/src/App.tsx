@@ -53,7 +53,6 @@ function App() {
         <Route path="/admin/users" element={<AdminRoute><Layout><UserManagement /></Layout></AdminRoute>} />
         <Route path="/telegram/accounts" element={<ProtectedRoute><Layout><TelegramAccounts /></Layout></ProtectedRoute>} />
         <Route path="/telegram/feed" element={<ProtectedRoute><Layout><LiveFeed /></Layout></ProtectedRoute>} />
-        <Route path="/telegram/summary" element={<ProtectedRoute><Layout><AISummary /></Layout></ProtectedRoute>} />
         <Route path="/telegram/downloader" element={<ProtectedRoute><Layout><DataMiner /></Layout></ProtectedRoute>} />
         <Route path="/telegram/files" element={<ProtectedRoute><Layout><FileManager /></Layout></ProtectedRoute>} />
         <Route path="/telegram/dumps" element={<ProtectedRoute><Layout><MessageDumpManager /></Layout></ProtectedRoute>} />

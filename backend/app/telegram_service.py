@@ -164,8 +164,6 @@ class TelegramManager:
             return {"chat_id": chat.id, "title": chat.title, "username": chat.username, "member_count": chat.members_count, "description": chat.description, "is_verified": chat.is_verified}
         except Exception as e: return {"error": str(e)}
 
-    @staticmethod
-    async def get_history_for_summary(session_id: int, chat_ids: list, start_time: datetime, end_time: datetime, limit: int = 500) -> list:
         """
         Fetch messages directly from Telegram for AI summary
         """

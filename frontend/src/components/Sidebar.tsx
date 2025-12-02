@@ -31,7 +31,6 @@ const menuItems: MenuItem[] = [
     children: [
       { name: 'Accounts', path: '/telegram/accounts', icon: Users },
       { name: 'Live Feed', path: '/telegram/feed', icon: Radio },
-      { name: 'AI Summary', path: '/telegram/summary', icon: Bot },
       { name: 'Data Miner', path: '/telegram/downloader', icon: Database },
       { name: 'Dump Manager', path: '/telegram/dumps', icon: Archive },
       { name: 'File Manager', path: '/telegram/files', icon: Folder },

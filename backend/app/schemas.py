@@ -71,17 +71,6 @@ class MessageResponse(BaseModel):
     timestamp: datetime
     class Config: from_attributes = True
 
-class SummaryRequest(BaseModel):
-    session_id: int
-    chat_ids: List[str] = []
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-
-class SummaryResponse(BaseModel):
-    summary: str
-    message_count: int
-    time_range: dict
-
 class DownloadRequest(BaseModel):
     session_id: int
     chat_id: str

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import init_db, AsyncSessionLocal, engine
-from app.routers import auth, admin, telegram, ai_summary, downloader, broadcaster, storage, dumper, academy
+from app.routers import auth, admin, telegram, downloader, broadcaster, storage, dumper, academy
 from app.models import TelegramSession, DumpTask
 from app.celery_worker import dump_messages_task
 from sqlalchemy import select, and_, text
@@ -53,7 +53,6 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.CORS_ORIGINS, allow_cr
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(telegram.router)
-app.include_router(ai_summary.router)
 app.include_router(downloader.router)
 app.include_router(broadcaster.router)
 app.include_router(storage.router)

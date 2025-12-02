@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     JWT_EXPIRATION_HOURS: int = 24
     ALLOW_REGISTRATION: bool = False
     DEBUG: bool = True
-    GEMINI_API_KEY: Optional[str] = None
     CORS_ORIGINS: list = ["http://localhost:5173", "http://localhost:3000"]
     
     # MinIO Internal (Docker Network)

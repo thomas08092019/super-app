@@ -71,17 +71,6 @@ export const dumperAPI = {
   getGroups: async () => (await api.get('/dumper/groups')).data
 };
 
-export const aiAPI = {
-  summarize: async (data: any) => {
-    const response = await api.post('/ai/summarize', data);
-    return response.data;
-  },
-  getHistory: async (page: number = 1) => {
-    const response = await api.get(`/ai/history?page=${page}`);
-    return response.data;
-  }
-};
-
 // --- ACADEMY API ---
 export const academyAPI = {
   getStats: async (): Promise<AcademyStats> => (await api.get('/academy/dashboard/stats')).data,
